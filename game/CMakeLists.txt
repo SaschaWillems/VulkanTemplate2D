@@ -11,4 +11,20 @@ source_group("game" FILES ${GAME_BASE_SRC_FILES})
 source_group("entities" FILES ${ENTITIY_SRC_FILES})
 source_group("object_types" FILES ${OBJECT_TYPES_SRC_FILES})
 
+# SFML
+set(SFML_VERSION "2.6.1")
+
+FetchContent_Declare(
+    sfml
+    GIT_REPOSITORY "https://github.com/SFML/SFML.git"
+    GIT_TAG        "${SFML_VERSION}"
+)
+
+FetchContent_GetProperties(sfml)
+if(NOT sfml_POPULATED)
+    FetchContent_Populate(sfml)
+endif()
+message(STATUS ${sfml_SOURCE_DIR})
+include_directories(${sfml_SOURCE_DIR}/include)
+
 add_library(game STATIC ${GAME_BASE_SRC_FILES} ${ENTITIY_SRC_FILES} ${OBJECT_TYPES_SRC_FILES})

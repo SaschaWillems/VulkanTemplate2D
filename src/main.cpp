@@ -15,11 +15,6 @@
 #include "time.h"
 #include <SFML/Audio.hpp>
 #include <json.hpp>
-#include "object_types/Monsters.hpp"
-#include "entities/Entity.hpp"
-#include "entities/Monster.hpp"
-#include "entities/Player.hpp"
-#include "entities/Projectile.hpp"
 #include "Game.hpp"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -66,8 +61,6 @@ struct InstanceData {
 AudioManager* audioManager{ nullptr };
 
 Game::Game game;
-
-std::default_random_engine rndGenerator((unsigned)time(nullptr));
 
 class Application : public VulkanApplication {
 private:
@@ -321,96 +314,6 @@ public:
 		delete stagingBuffer;
 	}
 
-	void monsterSpawnPosition(Game::Entities::Monster& monster) {
-		std::uniform_real_distribution<float> uniformDist(0.0, 1.0);
-		glm::vec2 ring{ screenDim.x * 1.5f, screenDim.x * 1.75f };
-		float rho, theta;
-		// Inner ring
-		rho = sqrt((pow(ring[1], 2.0f) - pow(ring[0], 2.0f)) * uniformDist(rndGenerator) + pow(ring[0], 2.0f));
-		theta = static_cast<float>(2.0f * M_PI * uniformDist(rndGenerator));
-		monster.position = glm::vec2(rho * cos(theta), rho * sin(theta)) + game.player.position;
-	}
-
-	// @todo
-	void spawnMonsters(uint32_t count) {
-		// @todo: Just testing
-		std::uniform_real_distribution<float> posDistX(-screenDim.x, screenDim.x);
-		std::uniform_real_distribution<float> posDistY(-screenDim.y, screenDim.y);
-		std::uniform_real_distribution<float> dirDist(-1.0f, 1.0f);
-		std::uniform_real_distribution<float> speedDist(0.5f, 2.5f);
-		std::uniform_real_distribution<float> scaleDist(0.5f, 1.0f);
-		// @todo: random from types instead, textures will also contain sprites that are not monsters
-		std::uniform_int_distribution<uint32_t> rndTextureIndex(0, static_cast<uint32_t>(textures.size() - 1));
-		std::uniform_int_distribution<uint32_t> spawnSectorDist(0, 3);
-
-		// Spawn in a ring centered at the player position
-		for (auto i = 0; i < count; i++) {
-			Game::Entities::Monster m;
-			monsterSpawnPosition(m);
-			m.imageIndex = rndTextureIndex(rndGenerator);
-			m.speed = speedDist(rndGenerator);
-			m.scale = scaleDist(rndGenerator);
-			game.monsters.push_back(m);
-		}
-	}
-
-	void spawnProjectile(Game::Entities::Source source, uint32_t imageIndex, glm::vec2 position, glm::vec2 direction) {
-		// @todo: grow in chunks
-		// @todo: check for dead projectiles and replace them instead
-		// @todo: Add projectile types with properties like speed, movement pattern, damage, source, tc.
-		Game::Entities::Projectile projectile{};
-		projectile.position = position;
-		projectile.direction = direction;
-		projectile.imageIndex = imageIndex;
-		projectile.source = source;
-		projectile.damage = 10.0f;
-		projectile.life = 100.0f;
-		projectile.speed = 15.0f;
-		projectile.scale = 0.5f;
-		projectile.state = Game::Entities::State::Alive;
-		game.projectiles.push_back(projectile);
-	}
-
-	void updateGameLogic() {
-		// @todo: totally work in progress
-
-		// Player projectiles
-		game.playerFireTimer += frameTimer * 25.0f;
-		if (game.playerFireTimer > game.playerFireTimerDuration) {
-			game.playerFireTimer = 0.0f;
-			std::uniform_real_distribution<float> dirDist(-1.0f, 1.0f);
-			spawnProjectile(Game::Entities::Source::Player, game.projectileImageIndex, game.player.position, glm::vec2(dirDist(rndGenerator), dirDist(rndGenerator)));
-		}
-
-		for (auto i = 0; i < game.projectiles.size(); i++) {
-			Game::Entities::Projectile& projectile = game.projectiles[i];
-			projectile.position += projectile.direction * projectile.speed * frameTimer;
-			projectile.life -= frameTimer * 50.0f;
-			if (projectile.life <= 0.0f) {
-				projectile.state = Game::Entities::State::Dead;
-			}
-		}
-
-		// Monster spawn
-		game.spawnTriggerTimer += frameTimer * 25.0f;
-		if (game.spawnTriggerTimer > game.spawnTriggerDuration) {
-			game.spawnTriggerTimer = 0.0f;
-			spawnMonsters(game.spawnTriggerMonsterCount);
-		}
-
-		for (auto i = 0; i < game.monsters.size(); i++) {
-			Game::Entities::Monster& monster = game.monsters[i];
-			// @todo: simple "logic" for testing
-			// @todo: Use velocity
-			// Monsters far away respawn outside of the view
-			if (glm::length(game.player.position - monster.position) > screenDim.x * 3.0f) {
-				monsterSpawnPosition(monster);
-			};
-			monster.direction = glm::normalize(game.player.position - monster.position);
-			monster.position += monster.direction * monster.speed * frameTimer;
-		}
-	}
-
 	void updateInstanceBuffer(FrameObjects& frame) {
 		uint32_t requestedInstanceCount = 
 			static_cast<uint32_t>(game.monsters.size()) +
@@ -487,6 +390,7 @@ public:
 
 		fileWatcher = new FileWatcher();
 
+		game.playFieldSize = screenDim;
 		game.player.speed = 5.0f;
 		game.player.scale = 1.0f;
 
@@ -496,7 +400,7 @@ public:
 
 		// @todo: for benchmarking, this is > 60 fps on my setup
 		//spawnMonsters(1150000);
-		spawnMonsters(game.spawnTriggerMonsterCount);
+		game.spawnMonsters(game.spawnTriggerMonsterCount);
 
 		// @todo: move camera out of vulkanapplication (so we can have multiple cameras)
 		camera.type = Camera::CameraType::firstperson;
@@ -766,7 +670,8 @@ public:
 		VulkanApplication::prepareFrame(currentFrame);
 		updateOverlay(getCurrentFrameIndex());
 		// @todo
-		updateGameLogic();
+		game.update(frameTimer);
+		game.updateInput(frameTimer);
 		updateInstanceBuffer(currentFrame);
 
 		shaderData.timer = timer;
@@ -782,25 +687,6 @@ public:
 				pipeline->reload();
 			}
 		}
-
-		float playerSpeed = game.player.speed;
-		if (sf::Keyboard::isKeyPressed(sf::Keyboard::LShift)) {
-			playerSpeed *= 2.0f;
-		}
-		if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
-			game.player.position.x -= playerSpeed * frameTimer;
-		}
-		if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
-			game.player.position.x += playerSpeed * frameTimer;
-		}
-		if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
-			game.player.position.y -= playerSpeed * frameTimer;
-		}
-		if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
-			game.player.position.y += playerSpeed * frameTimer;
-		}
-
-	//time += frameTimer;
 	}
 
 	void OnUpdateOverlay(vks::UIOverlay& overlay) {
