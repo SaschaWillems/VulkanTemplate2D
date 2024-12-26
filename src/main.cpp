@@ -447,25 +447,20 @@ public:
 
 		for (auto i = 0; i < game.monsters.size(); i++) {
 			Game::Entities::Monster& monster = game.monsters[i];
-			
-			frame.instances[i].imageIndex = monster.imageIndex;
-			frame.instances[i].pos = glm::vec3(monster.position, 0.0f);
-			frame.instances[i].scale = monster.scale;
-
-			instanceIndex++;
+			InstanceData& instance = frame.instances[instanceIndex++];
+			instance.imageIndex = monster.imageIndex;
+			instance.pos = glm::vec3(monster.position, 0.0f);
+			instance.scale = monster.scale;
 		}
 
 		// @todo: projectiles (maybe separate into own instance buffer due to diff. update frequency)
 		for (auto i = 0; i < game.projectiles.size(); i++) {
 			Game::Entities::Projectile& projectile = game.projectiles[i];
-
-			frame.instances[i].imageIndex = projectile.imageIndex;
-			frame.instances[i].pos = glm::vec3(projectile.position, 0.0f);
-			frame.instances[i].scale = projectile.scale;
-
-			instanceIndex++;
+			InstanceData& instance = frame.instances[instanceIndex++];
+			instance.imageIndex = projectile.imageIndex;
+			instance.pos = glm::vec3(projectile.position, 0.0f);
+			instance.scale = projectile.scale;
 		}
-
 
 		// @todo: player
 		frame.instances[instanceIndex] = {
