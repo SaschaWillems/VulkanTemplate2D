@@ -202,6 +202,7 @@ public:
 
 		// @todo: Projectile images
 		loadTexture(getAssetPath() + "game/projectiles/magic_bolt_1.png", game.projectileImageIndex);
+		loadTexture(getAssetPath() + "game/pickups/misc_crystal_old.png", game.experienceImageIndex);
 
 		SamplerCreateInfo samplerCI {
 			.name = "Sprite sampler",
@@ -318,6 +319,7 @@ public:
 		uint32_t maxInstanceCount = 
 			static_cast<uint32_t>(game.monsters.size()) +
 			static_cast<uint32_t>(game.projectiles.size()) +
+			static_cast<uint32_t>(game.pickups.size()) +
 			1;
 
 		if (frame.instanceBufferDrawCount < maxInstanceCount) {
@@ -352,6 +354,18 @@ public:
 			instance.imageIndex = projectile.imageIndex;
 			instance.pos = glm::vec3(projectile.position, 0.0f);
 			instance.scale = projectile.scale;
+		}
+
+		// Pickups (@todo: maybe separate into own instance buffer due to diff. update frequency)
+		for (auto i = 0; i < game.pickups.size(); i++) {
+			Game::Entities::Pickup& pickup = game.pickups[i];
+			if (pickup.state == Game::Entities::State::Dead) {
+				continue;
+			}
+			InstanceData& instance = frame.instances[instanceIndex++];
+			instance.imageIndex = pickup.imageIndex;
+			instance.pos = glm::vec3(pickup.position, 0.0f);
+			instance.scale = pickup.scale;
 		}
 
 		// Player

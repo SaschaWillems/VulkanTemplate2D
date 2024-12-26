@@ -78,6 +78,18 @@ void Game::Game::spawnProjectile(Entities::Source source, uint32_t imageIndex, g
 	projectiles.push_back(projectile);
 }
 
+void Game::Game::spawnPickup(Entities::Pickup pickup)
+{
+	// Replace dead pickups first
+	for (auto& pup : pickups) {
+		if (pup.state == Entities::State::Dead) {
+			pup = pickup;
+			return;
+		}
+	}
+	pickups.push_back(pickup);
+}
+
 void Game::Game::update(float delta)
 {
 	// @todo: totally work in progress
@@ -110,6 +122,14 @@ void Game::Game::update(float delta)
 					monster.health -= projectile.damage;
 					if (monster.health <= 0.0f) {
 						monster.state = Entities::State::Dead;
+						// @todo
+						Entities::Pickup xpPickup{};
+						xpPickup.type = Entities::Pickup::Type::Experience;
+						xpPickup.position = monster.position;
+						xpPickup.value = 10;
+						xpPickup.imageIndex = experienceImageIndex;
+						xpPickup.scale = 0.5f;
+						spawnPickup(xpPickup);
 					}
 				}
 			}

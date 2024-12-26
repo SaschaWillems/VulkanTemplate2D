@@ -16,6 +16,7 @@
 #include "entities/Monster.hpp"
 #include "entities/Player.hpp"
 #include "entities/Projectile.hpp"
+#include "entities/Pickup.hpp"
 
 namespace Game {
 
@@ -30,6 +31,7 @@ namespace Game {
 		// @todo: Entity manager
 		std::vector<Entities::Monster> monsters;
 		std::vector<Entities::Projectile> projectiles;
+		std::vector<Entities::Pickup> pickups;
 		Entities::Player player;
 
 		glm::vec2 playFieldSize;
@@ -39,16 +41,20 @@ namespace Game {
 		// Will be lowered with increasing game duration
 		float spawnTriggerDuration{ 100.0f };
 		// Will be increased with increasing game duration
-		uint32_t spawnTriggerMonsterCount{ 128 };
+		uint32_t spawnTriggerMonsterCount{ 16 };
 
 		// @todo
 		uint32_t projectileImageIndex;
+		uint32_t experienceImageIndex;
+
 		float playerFireTimer{ 0.0f };
 		float playerFireTimerDuration{ 5.0f };
 
 		Game();
 		void spawnMonsters(uint32_t count);
 		void spawnProjectile(Entities::Source source, uint32_t imageIndex, glm::vec2 position, glm::vec2 direction);
+		void spawnPickup(Entities::Pickup pickup);
+
 		void update(float delta);
 		void updateInput(float delta);
 	};
