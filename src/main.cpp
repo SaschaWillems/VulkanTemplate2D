@@ -20,6 +20,7 @@
 #include "entities/Monster.hpp"
 #include "entities/Player.hpp"
 #include "entities/Projectile.hpp"
+#include "Game.hpp"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -64,27 +65,7 @@ struct InstanceData {
 
 AudioManager* audioManager{ nullptr };
 
-// @todo
-class _Game {
-public:
-	ObjectTypes::MonsterTypes monsterTypes{};
-	// @todo: Entity manager
-	std::vector<Game::Entities::Monster> monsters;
-	std::vector<Game::Entities::Projectile> projectiles;
-	Game::Entities::Player player;
-
-	//
-	float spawnTriggerTimer{ 0.0f };
-	// Will be lowered with increasing game duration
-	float spawnTriggerDuration{ 100.0f };
-	// Will be increased with increasing game duration
-	uint32_t spawnTriggerMonsterCount{ 128 };
-
-	// @todo
-	uint32_t projectileImageIndex;
-	float playerFireTimer{ 0.0f };
-	float playerFireTimerDuration{ 5.0f };
-} game;
+Game::Game game;
 
 std::default_random_engine rndGenerator((unsigned)time(nullptr));
 

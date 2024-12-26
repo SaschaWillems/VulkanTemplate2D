@@ -4,29 +4,34 @@
 * This code is licensed under the MIT license(MIT) (http://opensource.org/licenses/MIT)
 */
 
-namespace ObjectTypes {
+#pragma once
 
-	class MonsterType {
-	public:
-		std::string name;
-		std::string image;
-		uint32_t imageIndex;
-		float size;
-		float health;
-		float speed;
-		float damage;
-	};
+#include <string>
 
-	class MonsterTypeSet {
-	public:
-		std::vector<MonsterType> types{};
-		std::string name;
-	};
+namespace Game {
+	namespace ObjectTypes {
 
-	class MonsterTypes {
-	public:
-		std::vector<MonsterTypeSet> sets{};
-		void loadFromFile(const std::string jsonFileName);
-	};
+		class MonsterType {
+		public:
+			std::string name;
+			std::string image;
+			uint32_t imageIndex;
+			float size;
+			float health;
+			float speed;
+		};
 
+		class MonsterTypeSet {
+		public:
+			std::vector<MonsterType> types{};
+			std::string name;
+		};
+
+		class MonsterTypes {
+		public:
+			std::vector<MonsterTypeSet> sets{};
+			void loadFromFile(const std::string jsonFileName);
+		};
+
+	}
 }
