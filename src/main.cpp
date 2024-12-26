@@ -315,43 +315,53 @@ public:
 	}
 
 	void updateInstanceBuffer(FrameObjects& frame) {
-		uint32_t requestedInstanceCount = 
+		uint32_t maxInstanceCount = 
 			static_cast<uint32_t>(game.monsters.size()) +
 			static_cast<uint32_t>(game.projectiles.size()) +
 			1;
 
-		if (frame.instanceBufferDrawCount < requestedInstanceCount) {
-			frame.instances = new InstanceData[requestedInstanceCount];
+		if (frame.instanceBufferDrawCount < maxInstanceCount) {
+			delete[] frame.instances;
+			frame.instances = new InstanceData[maxInstanceCount];
 			//frame.instances.resize(game.monsters.size());
 			// @todo: resize in chunks (e.g. 8192)
 		}
-		frame.instanceBufferDrawCount = static_cast<uint32_t>(requestedInstanceCount);
+
+		// Gather instances to be drawn
 		uint32_t instanceIndex{ 0 };
 
-
+		// Monsters
 		for (auto i = 0; i < game.monsters.size(); i++) {
 			Game::Entities::Monster& monster = game.monsters[i];
+			if (monster.state == Game::Entities::State::Dead) {
+				continue;
+			}
 			InstanceData& instance = frame.instances[instanceIndex++];
 			instance.imageIndex = monster.imageIndex;
 			instance.pos = glm::vec3(monster.position, 0.0f);
 			instance.scale = monster.scale;
 		}
 
-		// @todo: projectiles (maybe separate into own instance buffer due to diff. update frequency)
+		// Projectiles (@todo: maybe separate into own instance buffer due to diff. update frequency)
 		for (auto i = 0; i < game.projectiles.size(); i++) {
 			Game::Entities::Projectile& projectile = game.projectiles[i];
+			if (projectile.state == Game::Entities::State::Dead) {
+				continue;
+			}
 			InstanceData& instance = frame.instances[instanceIndex++];
 			instance.imageIndex = projectile.imageIndex;
 			instance.pos = glm::vec3(projectile.position, 0.0f);
 			instance.scale = projectile.scale;
 		}
 
-		// @todo: player
+		// Player
 		frame.instances[instanceIndex] = {
 			.pos = glm::vec3(game.player.position, 0.0f),
 			.scale = game.player.scale,
 			.imageIndex = game.player.imageIndex,
 		};
+
+		frame.instanceBufferDrawCount = instanceIndex + 1;
 		
 		assert(frame.instanceBufferDrawCount > 0);
 
