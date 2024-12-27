@@ -93,8 +93,9 @@ void Game::Game::spawnPickup(Entities::Pickup pickup)
 void Game::Game::update(float delta)
 {
 	// @todo: totally work in progress
+	// @todo: use multi threading
 
-// Player projectiles
+	// Player projectiles
 	playerFireTimer += delta * 25.0f;
 	if (playerFireTimer > playerFireTimerDuration) {
 		playerFireTimer = 0.0f;
@@ -129,8 +130,29 @@ void Game::Game::update(float delta)
 						xpPickup.value = 10;
 						xpPickup.imageIndex = experienceImageIndex;
 						xpPickup.scale = 0.5f;
+						xpPickup.speed = player.speed * 2.0f;
 						spawnPickup(xpPickup);
 					}
+				}
+			}
+		}
+	}
+
+	for (auto& pickup : pickups) {
+		if (pickup.state == Entities::State::Dead) {
+			continue;
+		}
+		// Experience moves towards the player once he gets in pickup range
+		// @todo: Pickup range as property of player
+		if (pickup.type == Entities::Pickup::Type::Experience) {
+			if (glm::distance(pickup.position, player.position) < 3.0f) {
+				pickup.direction = glm::normalize(player.position - pickup.position);
+				// @todo: pickup speed adjustments
+				pickup.position += pickup.direction * pickup.speed * delta;
+				// @todo: Proper collision check
+				if (glm::distance(player.position, pickup.position) < 1.0f) {
+					pickup.state = Entities::State::Dead;
+					player.addExperience(pickup.value);
 				}
 			}
 		}

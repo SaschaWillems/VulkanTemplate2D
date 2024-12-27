@@ -5,3 +5,9 @@
 */
 
 #include "Player.hpp"
+
+void Game::Entities::Player::addExperience(float value)
+{
+	// @todo: proper levelling
+	experience += value;
+}

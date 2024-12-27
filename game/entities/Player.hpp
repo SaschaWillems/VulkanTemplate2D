@@ -11,7 +11,9 @@
 namespace Game {
 	namespace Entities {
 		class Player : public Entity {
-
+		public:
+			float experience;
+			void addExperience(float value);
 		};
 	}
 }
