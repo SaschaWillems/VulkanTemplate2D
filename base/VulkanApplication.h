@@ -111,8 +111,8 @@ protected:
 	uint32_t renderAhead = 2;
 public: 
 	bool prepared = false;
-	uint32_t width = 1280;
-	uint32_t height = 720;
+	uint32_t width = 1024;
+	uint32_t height = 1024;
 
 	vks::UIOverlay* overlay{ nullptr };
 
@@ -146,7 +146,6 @@ public:
 
 	std::string title = "Vulkan Template 2D";
 	std::string name = "VulkanTemplate2D";
-	std::string windowTitle = "Vulkan Template 2D";
 	uint32_t apiVersion = VK_API_VERSION_1_0;
 
 	struct {

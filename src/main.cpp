@@ -128,6 +128,8 @@ public:
 		const float aspectRatio = (float)width / (float)height;
 		screenDim = glm::vec2(25.0f/* * aspectRatio*/, 25.0f);
 		shaderData.projection = glm::ortho(-screenDim.x, screenDim.x, -screenDim.x, screenDim.x);
+
+		title = "Bindless Survivors";
 	}
 
 	~Application() {		
@@ -661,9 +663,7 @@ public:
 		cb->bindVertexBuffers(1, 1, { frame.instanceBuffer->buffer });
 		cb->bindDescriptorSets(pipelineLayouts["sprite"], { descriptorSetTextures, descriptorSetSamplers, frame.descriptorSet });
 		cb->bindPipeline(pipelines["sprite"]);
-		//cb->updatePushConstant(pipelineLayouts["sprite"], 0, &pushConstBlock);
 		cb->draw(6, frame.instanceBufferDrawCount, 0, 0);
-		
 		if (overlay->visible) {
 			overlay->draw(cb, getCurrentFrameIndex());
 		}
@@ -698,8 +698,10 @@ public:
 		// @todo
 		{
 			ZoneScopedN("Game update");
-			game.update(frameTimer);
-			game.updateInput(frameTimer);
+			if (!paused) {
+				game.update(frameTimer);
+				game.updateInput(frameTimer);
+			}
 		}
 		{
 			ZoneScopedN("Instance buffer update");
@@ -722,11 +724,27 @@ public:
 	}
 
 	void OnUpdateOverlay(vks::UIOverlay& overlay) {
-		overlay.text("%d sprites", game.monsters.size());
-		overlay.text("playerpos: %.2f %.2f", game.player.position.x, game.player.position.y);
-		overlay.text("next spawn: %.2f", game.spawnTriggerDuration - game.spawnTriggerTimer);
-		//overlay.text("spawn count: %d", game.spawnTriggerMonsterCount);
-		overlay.text("projectiles: %d", static_cast<uint32_t>(game.projectiles.size()));
+		ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiSetCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(0, 90), ImGuiSetCond_FirstUseEver);
+		ImGui::Begin("Performance");
+		ImGui::TextUnformatted(vulkanDevice->properties.deviceName);
+		ImGui::Text("%.2f ms/frame (%.1d fps)", (1000.0f / lastFPS), lastFPS);
+		ImGui::End();
+
+		ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiSetCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(0, 50), ImGuiSetCond_FirstUseEver);
+		ImGui::Begin("Player");
+		ImGui::Text("XP: %.2f", game.player.experience);
+		ImGui::Text("Level: %d", game.player.level);
+		ImGui::End();
+
+		ImGui::SetNextWindowPos(ImVec2(30, 30), ImGuiSetCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(0, 50), ImGuiSetCond_FirstUseEver);
+		ImGui::Begin("Statistics", 0, ImGuiWindowFlags_None);
+		ImGui::Text("Monsters: %d", static_cast<uint32_t>(game.monsters.size()));
+		ImGui::Text("Projectiles: %d", static_cast<uint32_t>(game.projectiles.size()));
+		ImGui::Text("Pickups: %d", static_cast<uint32_t>(game.pickups.size()));
+		ImGui::End();
 	}
 
 	void onFileChanged(const std::string filename, const std::vector<void*> owners) {

@@ -268,6 +268,9 @@ void VulkanApplication::renderLoop()
 				if (event.key.code == sf::Keyboard::F1) {
 					overlay->visible = !overlay->visible;
 				}
+				if (event.key.code == sf::Keyboard::P) {
+					paused = !paused;
+				}
 				keyPressed(event.key.code);
 			}
 			if (event.type == sf::Event::MouseButtonPressed) {
@@ -562,33 +565,11 @@ void VulkanApplication::updateOverlay(uint32_t frameIndex)
 	io.DeltaTime = frameTimer;
 
 	io.MousePos = ImVec2(mousePos.x, mousePos.y);
-	io.MouseDown[0] = mouseButtons.left;
-	io.MouseDown[1] = mouseButtons.right;
-
-	//io.MouseDrawCursor = true;
+	io.MouseDown[0] = sf::Mouse::isButtonPressed(sf::Mouse::Button::Left);
+	io.MouseDown[1] = sf::Mouse::isButtonPressed(sf::Mouse::Button::Right);
 
 	ImGui::NewFrame();
-
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0);
-	ImGui::SetNextWindowPos(ImVec2(10, 10));
-	ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiSetCond_FirstUseEver);
-	ImGui::Begin("Application", nullptr);
-	ImGui::TextUnformatted(title.c_str());
-	ImGui::TextUnformatted(vulkanDevice->properties.deviceName);
-	ImGui::Text("%.2f ms/frame (%.1d fps)", (1000.0f / lastFPS), lastFPS);
-
-#if defined(VK_USE_PLATFORM_ANDROID_KHR)
-	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 5.0f * overlay->scale));
-#endif
-	ImGui::PushItemWidth(110.0f * overlay->scale);
 	OnUpdateOverlay(*overlay);
-	ImGui::PopItemWidth();
-#if defined(VK_USE_PLATFORM_ANDROID_KHR)
-	ImGui::PopStyleVar();
-#endif
-
-	ImGui::End();
-	ImGui::PopStyleVar();
 	ImGui::Render();
 
 	//Check if the overlay's index and vertex buffers needs to be updated (recreated), e.g. because new elements are visible and indices or vertices require additional buffer space
@@ -639,7 +620,7 @@ VulkanApplication::VulkanApplication()
 	commandLineParser.parse(args);
 	if (commandLineParser.isSet("help")) {
 #if defined(_WIN32)
-		setupConsole(windowTitle);
+		setupConsole(title);
 #endif
 		commandLineParser.printHelp();
 		std::cin.get();
@@ -915,7 +896,7 @@ void VulkanApplication::setupDPIAwareness()
 void VulkanApplication::setupWindow()
 {
 	window = new sf::WindowBase(sf::VideoMode(width, height), "SFML window with Vulkan", settings.fullscreen ? sf::Style::Fullscreen : sf::Style::Default);
-	window->setTitle(windowTitle);
+	window->setTitle(title);
 }
 
 #elif defined(VK_USE_PLATFORM_ANDROID_KHR)

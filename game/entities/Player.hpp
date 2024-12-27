@@ -13,6 +13,7 @@ namespace Game {
 		class Player : public Entity {
 		public:
 			float experience;
+			uint32_t level;
 			void addExperience(float value);
 		};
 	}
