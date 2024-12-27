@@ -18,6 +18,8 @@
 #include "entities/Projectile.hpp"
 #include "entities/Pickup.hpp"
 
+#include "AudioManager.h"
+
 namespace Game {
 
 

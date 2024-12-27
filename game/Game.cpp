@@ -101,6 +101,8 @@ void Game::Game::update(float delta)
 		playerFireTimer = 0.0f;
 		std::uniform_real_distribution<float> dirDist(-1.0f, 1.0f);
 		spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, glm::vec2(dirDist(randomEngine), dirDist(randomEngine)));
+		// @todo
+		audioManager->playSnd("laser");
 	}
 
 	// Collision check
@@ -132,6 +134,10 @@ void Game::Game::update(float delta)
 						xpPickup.scale = 0.5f;
 						xpPickup.speed = player.speed * 2.0f;
 						spawnPickup(xpPickup);
+						audioManager->playSnd("enemydeath");
+					}
+					else {
+						audioManager->playSnd("enemyhit");
 					}
 				}
 			}
@@ -153,6 +159,7 @@ void Game::Game::update(float delta)
 				if (glm::distance(player.position, pickup.position) < 1.0f) {
 					pickup.state = Entities::State::Dead;
 					player.addExperience(pickup.value);
+					audioManager->playSnd("pickupxp");
 				}
 			}
 		}

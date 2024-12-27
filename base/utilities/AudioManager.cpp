@@ -6,7 +6,9 @@
 
 #include "AudioManager.h"
 
-void AudioManager::AddSoundFile(const std::string name, const std::string filename)
+AudioManager* audioManager{ nullptr };
+
+void AudioManager::addSoundFile(const std::string name, const std::string filename)
 {
 	auto soundBuffer = new sf::SoundBuffer;
 	if (soundBuffer->loadFromFile(filename)) {
@@ -17,9 +19,10 @@ void AudioManager::AddSoundFile(const std::string name, const std::string filena
 	}
 }
 
-void AudioManager::PlaySnd(const std::string name)
+void AudioManager::playSnd(const std::string name)
 {
 	sound.setBuffer(*soundBuffers[name]);
+	sound.setVolume(soundVolume);
 	sound.play();
 }
 

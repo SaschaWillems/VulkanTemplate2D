@@ -58,8 +58,6 @@ struct InstanceData {
 	uint32_t imageIndex{ 0 };
 };
 
-AudioManager* audioManager{ nullptr };
-
 Game::Game game;
 
 class Application : public VulkanApplication {
@@ -216,11 +214,14 @@ public:
 		// @todo
 		// Audio
 		const std::map<std::string, std::string> soundFiles = {
-			{ "laser", "sounds/laser1.mp3" }
+			{ "laser", "sounds/sfx_wpn_laser7.wav" },
+			{ "enemyhit", "sounds/sfx_exp_various1.wav" },
+			{ "enemydeath", "sounds/sfx_exp_medium1.wav" },
+			{ "pickupxp", "sounds/sfx_coin_double4.wav" }
 		};
 
 		for (auto& it : soundFiles) {
-			audioManager->AddSoundFile(it.first, getAssetPath() + it.second);
+			audioManager->addSoundFile(it.first, getAssetPath() + it.second);
 		}
 	}
 
@@ -559,8 +560,9 @@ public:
 		fileWatcher->start();
 
 		// @todo
-		if (backgroundMusic.openFromFile(getAssetPath() + "music/singularity_calm.mp3")) {
+		if (backgroundMusic.openFromFile(getAssetPath() + "music/18._infinite_darkness.mp3")) {
 			backgroundMusic.setVolume(30);
+			backgroundMusic.setLoop(true);
 			backgroundMusic.play();
 		} else {
 			std::cout << "Could not load background music track\n";
@@ -694,9 +696,15 @@ public:
 		VulkanApplication::prepareFrame(currentFrame);
 		updateOverlay(getCurrentFrameIndex());
 		// @todo
-		game.update(frameTimer);
-		game.updateInput(frameTimer);
-		updateInstanceBuffer(currentFrame);
+		{
+			ZoneScopedN("Game update");
+			game.update(frameTimer);
+			game.updateInput(frameTimer);
+		}
+		{
+			ZoneScopedN("Instance buffer update");
+			updateInstanceBuffer(currentFrame);
+		}
 
 		shaderData.timer = timer;
 		//shaderData.view = glm::mat4(1.0f);
