@@ -58,6 +58,17 @@ struct InstanceData {
 	uint32_t imageIndex{ 0 };
 };
 
+struct TileMap {
+	vks::Texture2D* texture{ nullptr };
+	Sampler* sampler{ nullptr };
+	DescriptorSet* descriptorSetSampler{ nullptr };
+	uint32_t imageIndex;
+	uint32_t firstTileIndex;
+	uint32_t lastTileIndex;
+	uint32_t width = 2048;
+	uint32_t height = 2048;
+};
+
 Game::Game game;
 
 class Application : public VulkanApplication {
@@ -88,8 +99,9 @@ private:
 	std::vector<VkDescriptorImageInfo> textureDescriptors{};
 	std::vector<VkDescriptorImageInfo> samplerDescriptors{};
 	std::vector<vks::Texture2D*> textures{};
+	TileMap tileMap;
 	Sampler* spriteSampler{ nullptr };
-
+	
 	std::vector<FrameObjects> frameObjects;
 	FileWatcher* fileWatcher{ nullptr };
 	DescriptorPool* descriptorPool;
@@ -151,6 +163,10 @@ public:
 		for (auto& texture : textures) {
 			delete texture;
 		}
+		//for (auto& texture : tileMap.textures) {
+		//	delete texture;
+		//}
+		//delete tileMap.texture;
 		if (!copyCommandBuffer) {
 			delete copyCommandBuffer;
 		}
@@ -168,8 +184,8 @@ public:
 	void loadTexture(const std::string filename, uint32_t& index)
 	{
 		int width, height, channels;
-		unsigned char* img = stbi_load(filename.c_str(), &width, &height, &channels, 0);
-		size_t imgSize = static_cast<uint32_t>(width * height * channels);
+		unsigned char* img = stbi_load(filename.c_str(), &width, &height, &channels, 4);
+		size_t imgSize = static_cast<uint32_t>(width * height * 4);
 		assert(img != nullptr);
 
 		vks::TextureFromBufferCreateInfo texCI = {
@@ -185,7 +201,7 @@ public:
 
 		stbi_image_free(img);
 
-		index = static_cast<uint32_t>(textures.size() - 1);;
+		index = static_cast<uint32_t>(textures.size() - 1);
 	}
 
 	void loadAssets() {		
@@ -204,6 +220,12 @@ public:
 		loadTexture(getAssetPath() + "game/projectiles/magic_bolt_1.png", game.projectileImageIndex);
 		loadTexture(getAssetPath() + "game/pickups/misc_crystal_old.png", game.experienceImageIndex);
 
+		// @todo: tile map
+		uint32_t dummyIdx;
+		loadTexture(getAssetPath() + "game/tiles/set0/grass_0_new.png", tileMap.firstTileIndex);
+		loadTexture(getAssetPath() + "game/tiles/set0/grass0-dirt-mix_1.png", tileMap.lastTileIndex);
+		loadTexture(getAssetPath() + "game/tiles/set0/grass_full_old.png", tileMap.lastTileIndex);
+
 		SamplerCreateInfo samplerCI {
 			.name = "Sprite sampler",
 			.magFilter = VK_FILTER_NEAREST,
@@ -212,6 +234,15 @@ public:
 			.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
 		};
 		spriteSampler = new Sampler(samplerCI);
+
+		samplerCI = {
+			.name = "Tile map sampler",
+			.magFilter = VK_FILTER_NEAREST,
+			.minFilter = VK_FILTER_NEAREST,
+			.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+			.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+		};
+		tileMap.sampler = new Sampler(samplerCI);
 
 		// @todo
 		// Audio
@@ -227,6 +258,33 @@ public:
 		}
 	}
 
+	// @todo
+	// Tile map for the background is stored as a single one integer channel format, with each pixel storing a zero-based tile index
+	void createTileMap () {
+		const size_t texBufferSize = tileMap.width * tileMap.height * 4;
+		uint32_t* texBuffer = new uint32_t[texBufferSize];
+		memset(texBuffer, 2, texBufferSize);
+		
+		// @todo: random tiles for testing
+		std::uniform_int_distribution<uint32_t> rndTile(0, static_cast<uint32_t>(0, tileMap.lastTileIndex - tileMap.firstTileIndex));
+		for (size_t i = 0; i < tileMap.width * tileMap.height; i++) {
+			auto tileIndex = rndTile(game.randomEngine);
+			texBuffer[i] = tileIndex;
+		}
+		vks::TextureFromBufferCreateInfo texCI = {
+			.buffer = texBuffer,
+			.bufferSize = texBufferSize,
+			.texWidth = 2048,
+			.texHeight = 2048,
+			.format = VK_FORMAT_R32_UINT,
+			.createSampler = false,
+		};
+		// @todo: Throws validation errors
+		tileMap.texture = new vks::Texture2D(texCI);
+		textures.push_back(tileMap.texture);
+		tileMap.imageIndex = static_cast<uint32_t>(textures.size() - 1);
+	}
+
 	void updateTextureDescriptor() {
 		// @todo: actual update logic
 
@@ -236,7 +294,7 @@ public:
 			textureDescriptors.push_back(tex->descriptor);
 		}
 
-		const uint32_t textureCount = static_cast<uint32_t>(textureDescriptors.size());
+		uint32_t textureCount = static_cast<uint32_t>(textureDescriptors.size());
 		descriptorSetLayoutTextures = new DescriptorSetLayout({
 			.descriptorIndexing = true,
 			.bindings = {
@@ -272,6 +330,15 @@ public:
 			.layouts = { descriptorSetLayoutSamplers->handle },
 			.descriptors = {
 				{.dstBinding = 0, .descriptorCount = samplerCount, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .pImageInfo = samplerDescriptors.data()},
+			}
+		});
+
+		tileMap.descriptorSetSampler = new DescriptorSet({
+			.pool = descriptorPool,
+			.variableDescriptorCount = samplerCount,
+			.layouts = { descriptorSetLayoutSamplers->handle },
+			.descriptors = {
+				{.dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .pImageInfo = &tileMap.sampler->descriptor},
 			}
 		});
 	}
@@ -422,8 +489,8 @@ public:
 		game.player.scale = 1.0f;
 
 		loadAssets();
-
 		generateQuad();
+		createTileMap();
 
 		// @todo: for benchmarking, this is > 60 fps on my setup
 		//spawnMonsters(1150000);
@@ -483,12 +550,10 @@ public:
 		VkPipelineColorBlendAttachmentState blendAttachmentState{};
 		blendAttachmentState.colorWriteMask = 0xf;
 
+		// Sprites
+
 		pipelineLayouts["sprite"] = new PipelineLayout({
 			.layouts = { descriptorSetLayoutTextures->handle, descriptorSetLayoutSamplers->handle, descriptorSetLayoutUniforms->handle },
-			//.pushConstantRanges = {
-			//	// @todo
-			//	{ .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = sizeof(PushConstBlock) }
-			//}
 		});
 
 		PipelineVertexInput vertexInput = {
@@ -550,8 +615,64 @@ public:
 			},
 			.enableHotReload = true
 		});
-
  		pipelineList.push_back(pipelines["sprite"]);
+
+		// Tilemap
+
+
+		pipelineLayouts["tilemap"] = new PipelineLayout({
+			.layouts = { descriptorSetLayoutTextures->handle, descriptorSetLayoutSamplers->handle, descriptorSetLayoutUniforms->handle },
+			// Index of the tilemap is passed via push constant, tile set starts at that index + 1
+			.pushConstantRanges = {
+				{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = sizeof(uint32_t) * 2 + sizeof(float) * 2}
+			}
+		});
+
+		pipelines["tilemap"] = new Pipeline({
+			.shaders = {
+				getAssetPath() + "shaders/tilemap.vert.hlsl",
+				getAssetPath() + "shaders/tilemap.frag.hlsl"
+			},
+			.cache = pipelineCache,
+			.layout = *pipelineLayouts["tilemap"],
+			//.vertexInput = vertexInput,
+			.inputAssemblyState = {
+				.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+			},
+			.viewportState = {
+				.viewportCount = 1,
+				.scissorCount = 1
+			},
+			.rasterizationState = {
+				.polygonMode = VK_POLYGON_MODE_FILL,
+				.cullMode = VK_CULL_MODE_BACK_BIT,
+				.frontFace = VK_FRONT_FACE_CLOCKWISE,
+				.lineWidth = 1.0f
+			},
+			.multisampleState = {
+				.rasterizationSamples = settings.sampleCount,
+			},
+			.depthStencilState = {
+				.depthTestEnable = VK_FALSE,
+				.depthWriteEnable = VK_FALSE,
+				.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+			},
+			.blending = {
+				.attachments = { blendAttachmentState }
+			},
+			.dynamicState = {
+				DynamicState::Scissor,
+				DynamicState::Viewport
+			},
+			.pipelineRenderingInfo = {
+				.colorAttachmentCount = 1,
+				.pColorAttachmentFormats = &swapChain->colorFormat,
+				.depthAttachmentFormat = depthFormat,
+				.stencilAttachmentFormat = depthFormat
+			},
+			.enableHotReload = true
+		});
+		pipelineList.push_back(pipelines["tilemap"]);
 
 		for (auto& pipeline : pipelineList) {
 			fileWatcher->addPipeline(pipeline);
@@ -648,13 +769,20 @@ public:
 		cb->setViewport(0.0f, 0.0f, (float)width, (float)height, 0.0f, 1.0f);
 		cb->setScissor(0, 0, width, height);
 
-		// Backdrop
-		//PushConstBlock pushConstBlock{};
-		//pushConstBlock.textureIndex = skyboxIndex;
-		//cb->bindPipeline(pipelines["skybox"]);
-		//cb->bindDescriptorSets(skyboxPipelineLayout, { frame.descriptorSet, descriptorSetTextures });
-		//cb->updatePushConstant(skyboxPipelineLayout, 0, &pushConstBlock);
-		//assetManager->models["crate"]->draw(cb->handle, glTFPipelineLayout->handle, glm::mat4(1.0f), true, true);
+		// Draw tilemap (background)
+		struct PushConsts {
+			uint32_t uints[2];
+			float floats[2];
+		} pushConsts;
+		pushConsts.uints[0] = tileMap.imageIndex;
+		pushConsts.uints[1] = tileMap.firstTileIndex;
+		pushConsts.floats[0] = (float)width / 32.0f;
+		pushConsts.floats[1] = (float)height / 32.0f;
+
+		cb->bindDescriptorSets(pipelineLayouts["tilemap"], { descriptorSetTextures, tileMap.descriptorSetSampler, frame.descriptorSet });
+		cb->bindPipeline(pipelines["tilemap"]);
+		cb->updatePushConstant(pipelineLayouts["tilemap"], 0, &pushConsts);
+		cb->draw(3, 1, 0, 0);
 
 		// Draw sprites using instancing
 		// Instancing buffer stores sprite index, position, scale, direction (to flip/rotate) uv, maybe color for health state
