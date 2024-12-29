@@ -69,8 +69,8 @@ struct TileMap {
 	uint32_t imageIndex;
 	uint32_t firstTileIndex;
 	uint32_t lastTileIndex;
-	uint32_t width = 2048;
-	uint32_t height = 2048;
+	uint32_t width = 4096;
+	uint32_t height = 4096;
 };
 
 Game::Game game;
@@ -791,6 +791,8 @@ public:
 		pushConsts.floats[0] = (float)width / 32.0f;
 		pushConsts.floats[1] = (float)height / 32.0f;
 
+		pushConsts.floats[0] = 1024.0f / 32.0f;
+		pushConsts.floats[1] = 1024.0f / 32.0f;
 		cb->bindDescriptorSets(pipelineLayouts["tilemap"], { descriptorSetTextures, tileMap.descriptorSetSampler, frame.descriptorSet });
 		cb->bindPipeline(pipelines["tilemap"]);
 		cb->updatePushConstant(pipelineLayouts["tilemap"], 0, &pushConsts);
