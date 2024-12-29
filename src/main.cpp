@@ -277,8 +277,8 @@ public:
 		vks::TextureFromBufferCreateInfo texCI = {
 			.buffer = texBuffer,
 			.bufferSize = texBufferSize,
-			.texWidth = 4096,
-			.texHeight = 4096,
+			.texWidth = tileMap.width,
+			.texHeight = tileMap.height,
 			.format = VK_FORMAT_R32_UINT,
 			.createSampler = false,
 		};
@@ -488,12 +488,15 @@ public:
 		fileWatcher = new FileWatcher();
 
 		game.playFieldSize = screenDim;
-		game.player.speed = 5.0f;
-		game.player.scale = 1.0f;
 
 		loadAssets();
 		generateQuad();
 		createTileMap();
+
+		game.player.speed = 5.0f;
+		game.player.scale = 1.0f;
+		game.player.position = glm::vec2(-(float)tileMap.width / 2.0f, -(float)tileMap.height / 2.0f);
+
 
 		// @todo: for benchmarking, this is > 60 fps on my setup
 		//spawnMonsters(1150000);
