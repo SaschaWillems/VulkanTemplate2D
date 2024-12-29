@@ -45,7 +45,10 @@ struct ShaderData {
 	glm::mat4 view;
 	float time{ 0.0f };
 	float timer{ 0.0f };
+	float tileMapSpeed;
 } shaderData;
+
+float tileMapSpeed{ 2.08f };
 
 struct Vertex {
 	float pos[3];
@@ -263,7 +266,7 @@ public:
 	void createTileMap () {
 		const size_t texBufferSize = tileMap.width * tileMap.height * 4;
 		uint32_t* texBuffer = new uint32_t[texBufferSize];
-		memset(texBuffer, 2, texBufferSize);
+		memset(texBuffer, 0, texBufferSize);
 		
 		// @todo: random tiles for testing
 		std::uniform_int_distribution<uint32_t> rndTile(0, static_cast<uint32_t>(0, tileMap.lastTileIndex - tileMap.firstTileIndex));
@@ -274,8 +277,8 @@ public:
 		vks::TextureFromBufferCreateInfo texCI = {
 			.buffer = texBuffer,
 			.bufferSize = texBufferSize,
-			.texWidth = 2048,
-			.texHeight = 2048,
+			.texWidth = 4096,
+			.texHeight = 4096,
 			.format = VK_FORMAT_R32_UINT,
 			.createSampler = false,
 		};
@@ -839,6 +842,7 @@ public:
 		shaderData.timer = timer;
 		//shaderData.view = glm::mat4(1.0f);
 		shaderData.view = glm::translate(glm::mat4(1.0f), -glm::vec3(game.player.position / screenDim, 0.0f));
+		shaderData.tileMapSpeed = tileMapSpeed;
 		memcpy(currentFrame.uniformBuffer->mapped, &shaderData, sizeof(ShaderData)); // @todo: buffer function
 
 		recordCommandBuffer(currentFrame);
