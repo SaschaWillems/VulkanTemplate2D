@@ -32,9 +32,9 @@ float4 main(VSOutput input) : SV_TARGET
 {
     float4 color = textures[input.textureIndex].Sample(samplers[0], input.uv);
     //float4 color = textures[primitive.spriteIndex].Sample(samplers[0], input.uv);
-    if (color.a < 1.0)
+    if (color.a < 0.5)
     {
         discard;
     }
-    return color;    
+    return color * input.color;
 }

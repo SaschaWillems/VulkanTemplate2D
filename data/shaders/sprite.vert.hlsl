@@ -16,6 +16,7 @@ struct VSInput
     [[vk::location(2)]] float3 instancePos : POSITION1;
     [[vk::location(3)]] float instanceScale: POSITION2;
     [[vk::location(4)]] int instanceTextureIndex : TEXCOORD3;
+    [[vk::location(5)]] int instanceEffect : TEXCOORD4;
 };
 
 struct PushConsts {
@@ -38,5 +39,13 @@ VSOutput main(VSInput input)
     output.pos = mul(ubo.view, mul(ubo.projection, float4(locPos + input.instancePos, 1.0)));
     output.uv = input.uv;
     output.textureIndex = input.instanceTextureIndex;
+    if (input.instanceEffect == 1)
+    {
+        output.color = float4(20.0, 20.0, 20.0, 1.0);
+    }
+    else
+    {
+        output.color = float4((1.0).rrrr);
+    }
     return output;
 }

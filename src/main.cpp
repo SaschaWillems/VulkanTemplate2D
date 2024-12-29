@@ -59,6 +59,7 @@ struct InstanceData {
 	glm::vec3 pos;
 	float scale{ 1.0f };
 	uint32_t imageIndex{ 0 };
+	uint32_t effect{ 0 };
 };
 
 struct TileMap {
@@ -415,6 +416,7 @@ public:
 			instance.imageIndex = monster.imageIndex;
 			instance.pos = glm::vec3(monster.position, 0.0f);
 			instance.scale = monster.scale;
+			instance.effect = static_cast<uint32_t>(monster.effect);
 		}
 
 		// Projectiles (@todo: maybe separate into own instance buffer due to diff. update frequency)
@@ -427,6 +429,7 @@ public:
 			instance.imageIndex = projectile.imageIndex;
 			instance.pos = glm::vec3(projectile.position, 0.0f);
 			instance.scale = projectile.scale;
+			instance.effect = static_cast<uint32_t>(projectile.effect);
 		}
 
 		// Pickups (@todo: maybe separate into own instance buffer due to diff. update frequency)
@@ -439,6 +442,7 @@ public:
 			instance.imageIndex = pickup.imageIndex;
 			instance.pos = glm::vec3(pickup.position, 0.0f);
 			instance.scale = pickup.scale;
+			instance.effect = static_cast<uint32_t>(pickup.effect);
 		}
 
 		// Player
@@ -446,6 +450,7 @@ public:
 			.pos = glm::vec3(game.player.position, 0.0f),
 			.scale = game.player.scale,
 			.imageIndex = game.player.imageIndex,
+			.effect = static_cast<uint32_t>(game.player.effect)
 		};
 
 		frame.instanceBufferDrawCount = instanceIndex + 1;
@@ -574,6 +579,7 @@ public:
 				{ .location = 2, .binding = 1, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(InstanceData, pos) },
 				{ .location = 3, .binding = 1, .format = VK_FORMAT_R32_SFLOAT, .offset = offsetof(InstanceData, scale) },
 				{ .location = 4, .binding = 1, .format = VK_FORMAT_R32_SINT, .offset = offsetof(InstanceData, imageIndex) },
+				{ .location = 5, .binding = 1, .format = VK_FORMAT_R32_SINT, .offset = offsetof(InstanceData, effect) },
 			}
 		};
 

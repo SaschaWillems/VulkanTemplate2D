@@ -22,6 +22,11 @@ namespace Game {
 			Dead = 1
 		};
 
+		enum class Effect {
+			None = 0,
+			Hit = 1,
+		};
+
 		class Entity {
 		public:
 			glm::vec2 position{};
@@ -33,8 +38,13 @@ namespace Game {
 			// @todo: archetype instead
 			uint32_t imageIndex;
 			// @todo
-			Source source = Source::Player;
-			State state = State::Alive;
+			Source source{ Source::Player };
+			State state{ State::Alive };
+			// @todo
+			Effect effect{ Effect::None };
+			float effectTimer{ 1.0f };
+			void setEffect(Effect effect);
+			void update(float delta);
 		};
 	}
 }

@@ -123,6 +123,8 @@ void Game::Game::update(float delta)
 					projectile.state = Entities::State::Dead;
 					// @todo: Move logic to entity
 					monster.health -= projectile.damage;
+					monster.setEffect(Entities::Effect::Hit);
+					// @todo: Use instance color and timer to highlight hit monsters for a short duration
 					if (monster.health <= 0.0f) {
 						monster.state = Entities::State::Dead;
 						// @todo
@@ -186,6 +188,7 @@ void Game::Game::update(float delta)
 		// @todo: simple "logic" for testing
 		// @todo: Use velocity
 		// Monsters far away respawn outside of the view
+		monster.update(delta);
 		if (glm::length(player.position - monster.position) > playFieldSize.x * 3.0f) {
 			monsterSpawnPosition(monster);
 		};
