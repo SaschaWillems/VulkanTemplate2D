@@ -146,6 +146,8 @@ public:
 		shaderData.projection = glm::ortho(-screenDim.x, screenDim.x, -screenDim.x, screenDim.x);
 
 		title = "Bindless Survivors";
+
+		paused = true;
 	}
 
 	~Application() {		
@@ -932,7 +934,6 @@ public:
 		ImGui::Text("Projectiles: %d", static_cast<uint32_t>(game.projectiles.size()));
 		ImGui::Text("Pickups: %d", static_cast<uint32_t>(game.pickups.size()));
 		ImGui::Text("Numbers: %d", static_cast<uint32_t>(game.numbers.size()));
-		ImGui::End();
 		ImGui::End();
 	}
 
