@@ -208,6 +208,12 @@ public:
 		index = static_cast<uint32_t>(textures.size() - 1);
 	}
 
+	void loadTexture(const std::string filename)
+	{
+		uint32_t index;
+		loadTexture(filename, index);
+	}
+
 	void loadAssets() {		
 		game.monsterTypes.loadFromFile(getAssetPath() + "game/monsters.json");
 		// @todo
@@ -215,6 +221,12 @@ public:
 			for (auto& type : set.types) {
 				loadTexture(getAssetPath() + "game/monsters/" + type.image, type.imageIndex);
 			}
+		}
+
+		// Numbers
+		game.firstNumberImageIndex = static_cast<uint32_t>(textures.size());
+		for (uint32_t i = 0; i < 10; i++) {
+			loadTexture(getAssetPath() + "game/numbers/num_" + std::to_string(i) + ".png");
 		}
 
 		// @todo: Player images
@@ -271,10 +283,21 @@ public:
 		
 		// @todo: random tiles for testing
 		std::uniform_int_distribution<uint32_t> rndTile(0, static_cast<uint32_t>(0, tileMap.lastTileIndex - tileMap.firstTileIndex));
+		// @todo: generate border to see how tile map size works
+		uint32_t tileCounter{ 0 };
+		uint32_t tileType = 0;
 		for (size_t i = 0; i < tileMap.width * tileMap.height; i++) {
-			auto tileIndex = rndTile(game.randomEngine);
-			texBuffer[i] = tileIndex;
+			if (tileCounter >= tileMap.width * 8) {
+				tileType = rndTile(game.randomEngine);
+				tileCounter = 0;
+			}
+			texBuffer[i] = tileType;
+			tileCounter++;
 		}
+
+		//for (auto i = 0; i < tileMap.width; i++) {
+		//	texBuffer[i] = 2;
+		//}
 		vks::TextureFromBufferCreateInfo texCI = {
 			.buffer = texBuffer,
 			.bufferSize = texBufferSize,
@@ -394,6 +417,8 @@ public:
 			static_cast<uint32_t>(game.monsters.size()) +
 			static_cast<uint32_t>(game.projectiles.size()) +
 			static_cast<uint32_t>(game.pickups.size()) +
+			// @todo: Max. 3 digits per number for now
+			(static_cast<uint32_t>(game.numbers.size()) * 3) +
 			1;
 
 		if (frame.instanceBufferDrawCount < maxInstanceCount) {
@@ -443,6 +468,24 @@ public:
 			instance.pos = glm::vec3(pickup.position, 0.0f);
 			instance.scale = pickup.scale;
 			instance.effect = static_cast<uint32_t>(pickup.effect);
+		}
+
+		// Numbers (@todo: maybe separate into own instance buffer due to diff. update frequency)
+		for (auto i = 0; i < game.numbers.size(); i++) {
+			Game::Entities::Number& number = game.numbers[i];
+			if (number.state == Game::Entities::State::Dead) {
+				continue;
+			}
+			// Draw one instance per number digit
+			for (auto i = 0; i < number.digits; i++) {
+				InstanceData& instance = frame.instances[instanceIndex++];
+				const char v = number.stringValue[i];
+				instance.imageIndex = game.firstNumberImageIndex + std::atoi(&v);
+				// @todo: center
+				instance.pos = glm::vec3(number.position + glm::vec2(i * number.scale * 0.75f, 0.0f), 0.0f);
+				instance.scale = number.scale;
+				instance.effect = static_cast<uint32_t>(number.effect);
+			}
 		}
 
 		// Player
@@ -793,6 +836,7 @@ public:
 
 		pushConsts.floats[0] = 1024.0f / 32.0f;
 		pushConsts.floats[1] = 1024.0f / 32.0f;
+
 		cb->bindDescriptorSets(pipelineLayouts["tilemap"], { descriptorSetTextures, tileMap.descriptorSetSampler, frame.descriptorSet });
 		cb->bindPipeline(pipelines["tilemap"]);
 		cb->updatePushConstant(pipelineLayouts["tilemap"], 0, &pushConsts);
@@ -887,6 +931,8 @@ public:
 		ImGui::Text("Monsters: %d", static_cast<uint32_t>(game.monsters.size()));
 		ImGui::Text("Projectiles: %d", static_cast<uint32_t>(game.projectiles.size()));
 		ImGui::Text("Pickups: %d", static_cast<uint32_t>(game.pickups.size()));
+		ImGui::Text("Numbers: %d", static_cast<uint32_t>(game.numbers.size()));
+		ImGui::End();
 		ImGui::End();
 	}
 

@@ -90,6 +90,23 @@ void Game::Game::spawnPickup(Entities::Pickup pickup)
 	pickups.push_back(pickup);
 }
 
+void Game::Game::spawnNumber(uint32_t value, glm::vec2 position)
+{
+	// @todo: grow in chunks
+	Entities::Number number{};
+	number.position = position;
+	number.direction = glm::vec2(0.f, -1.0f);
+	number.life = 100.0f;
+	number.setValue(value);
+	for (auto& num : numbers) {
+		if (num.state == Entities::State::Dead) {
+			num = number;
+			return;
+		}
+	}
+	numbers.push_back(number);
+}
+
 void Game::Game::update(float delta)
 {
 	// @todo: totally work in progress
@@ -124,6 +141,7 @@ void Game::Game::update(float delta)
 					// @todo: Move logic to entity
 					monster.health -= projectile.damage;
 					monster.setEffect(Entities::Effect::Hit);
+					spawnNumber(projectile.damage, monster.position);
 					// @todo: Use instance color and timer to highlight hit monsters for a short duration
 					if (monster.health <= 0.0f) {
 						monster.state = Entities::State::Dead;
@@ -173,6 +191,15 @@ void Game::Game::update(float delta)
 		projectile.life -= delta * 50.0f;
 		if (projectile.life <= 0.0f) {
 			projectile.state = Entities::State::Dead;
+		}
+	}
+
+	for (auto i = 0; i < numbers.size(); i++) {
+		Entities::Number& number = numbers[i];
+		number.position += number.direction * number.speed * delta;
+		number.life -= delta * 50.0f;
+		if (number.life <= 0.0f) {
+			number.state = Entities::State::Dead;
 		}
 	}
 
