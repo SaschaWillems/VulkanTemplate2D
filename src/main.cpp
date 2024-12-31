@@ -78,13 +78,14 @@ Game::Game game;
 class Application : public VulkanApplication {
 private:
 	// Changing buffers (e.g. instance, will increase by this size)
-	const uint32_t spriteBufferBlockSize{ 16384 };
+	const uint32_t instanceBufferBlockSizeIncrease{ 2048 };
 	struct FrameObjects : public VulkanFrameObjects {
 		Buffer* uniformBuffer{ nullptr };
 		DescriptorSet* descriptorSet{ nullptr };
 		Buffer* instanceBuffer{ nullptr };
 		uint32_t instanceBufferSize{ 0 };
 		uint32_t instanceBufferDrawCount{ 0 };
+		uint32_t instanceBufferMaxCount{ 0 };
 		InstanceData* instances{nullptr};
 		// @todo: Separate projectiles into own set of instance buffers (due to different update frequency?)
 		//struct Projectiles {
@@ -415,7 +416,7 @@ public:
 	}
 
 	void updateInstanceBuffer(FrameObjects& frame) {
-		uint32_t maxInstanceCount = 
+		const uint32_t maxInstanceCount = 
 			static_cast<uint32_t>(game.monsters.size()) +
 			static_cast<uint32_t>(game.projectiles.size()) +
 			static_cast<uint32_t>(game.pickups.size()) +
@@ -423,11 +424,20 @@ public:
 			(static_cast<uint32_t>(game.numbers.size()) * 3) +
 			1;
 
-		if (frame.instanceBufferDrawCount < maxInstanceCount) {
+		// Only recreate buffer if necessary, resizing is done in "chunks" to avoid frequent resizes
+		const int32_t minInstanceBufferCount = std::max(maxInstanceCount + instanceBufferBlockSizeIncrease - 1 - (maxInstanceCount + instanceBufferBlockSizeIncrease - 1) % instanceBufferBlockSizeIncrease, instanceBufferBlockSizeIncrease);
+		if (frame.instanceBufferMaxCount < minInstanceBufferCount) {
+			std::cout << "Resizing instance buffer for frame " << frame.index << " to " << minInstanceBufferCount << " elements\n";
+			// Host
 			delete[] frame.instances;
-			frame.instances = new InstanceData[maxInstanceCount];
-			//frame.instances.resize(game.monsters.size());
-			// @todo: resize in chunks (e.g. 8192)
+			frame.instances = new InstanceData[minInstanceBufferCount];
+			// Device
+			delete frame.instanceBuffer;
+			frame.instanceBuffer = new Buffer({
+				.usageFlags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				.size = minInstanceBufferCount * sizeof(InstanceData)
+			});
+			frame.instanceBufferMaxCount = minInstanceBufferCount;
 		}
 
 		// Gather instances to be drawn
@@ -505,14 +515,6 @@ public:
 		const size_t instanceBufferSize = frame.instanceBufferDrawCount * sizeof(InstanceData);
 		stagingBuffer->copyTo(frame.instances, instanceBufferSize);
 
-		// Only recreate buffer if necessary
-		if (!frame.instanceBuffer || frame.instanceBufferSize < instanceBufferSize) {
-			delete frame.instanceBuffer;
-			frame.instanceBuffer = new Buffer({
-				.usageFlags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-				.size = instanceBufferSize
-			});
-		}
 		frame.instanceBufferSize = instanceBufferSize;
 
 		if (!copyCommandBuffer) {
@@ -556,8 +558,10 @@ public:
 		camera.type = Camera::CameraType::firstperson;
 
 		frameObjects.resize(getFrameCount());
+		size_t frameIdx = 0;
 		for (FrameObjects& frame : frameObjects) {
 			createBaseFrameObjects(frame);
+			frame.index = frameIdx++;
 			frameObjects.resize(getFrameCount());
 			frame.uniformBuffer = new Buffer({
 				.usageFlags = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
