@@ -794,7 +794,7 @@ public:
 		colorAttachment.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR;
 		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		colorAttachment.clearValue.color = { 0.0f, 0.15f, 0.0f, 0.0f };
+		colorAttachment.clearValue.color = { 0.0f, 0.0f, 0.0f, 0.0f };
 		if (multiSampling) {
 			colorAttachment.resolveImageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
 			colorAttachment.resolveImageView = swapChain->buffers[swapChain->currentImageIndex].view;
@@ -827,7 +827,11 @@ public:
 		};
 
 		cb->beginRendering(renderingInfo);
-		cb->setViewport(0.0f, 0.0f, (float)width, (float)height, 0.0f, 1.0f);
+		// Game uses a fixed 4:3 aspect ratio for now
+		float vpHeight = (float)height;
+		float vpWidth = vpHeight * 4.0f / 3.0f;
+		float vpLeft = ((float)width - vpWidth) / 2.0f;
+		cb->setViewport(vpLeft, 0.0f, vpWidth, vpHeight, 0.0f, 1.0f);
 		cb->setScissor(0, 0, width, height);
 
 		// Draw tilemap (background)

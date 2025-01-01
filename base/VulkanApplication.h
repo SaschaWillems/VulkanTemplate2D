@@ -64,6 +64,7 @@
 
 struct VulkanFrameObjects
 {
+	size_t index;
 	CommandBuffer* commandBuffer;
 	VkFence renderCompleteFence;
 	VkSemaphore renderCompleteSemaphore;
