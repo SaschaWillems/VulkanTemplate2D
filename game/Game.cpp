@@ -98,6 +98,7 @@ void Game::Game::spawnNumber(uint32_t value, glm::vec2 position)
 	number.direction = glm::vec2(0.f, -1.0f);
 	number.life = 100.0f;
 	number.setValue(value);
+	// Replace unused numbers first
 	for (auto& num : numbers) {
 		if (num.state == Entities::State::Dead) {
 			num = number;
@@ -122,84 +123,108 @@ void Game::Game::update(float delta)
 		audioManager->playSnd("laser");
 	}
 
-	// Collision check
-	for (auto& projectile : projectiles) {
-		if (projectile.state == Entities::State::Dead) {
-			continue;
-		}
-		// @todo: effect on hit target
-		// @todo: move collision check to entity
-		if (projectile.source == Entities::Source::Player) {
-			for (auto & monster : monsters) {
-				if (monster.state == Entities::State::Dead) {
-					continue;
-				}
-				// @todo: Proper collision check
-				if (abs(glm::distance(monster.position, projectile.position)) < 1.0f) {
-					// @todo: Projectiles that can hit multiple enemies before "dying"
-					projectile.state = Entities::State::Dead;
-					// @todo: Move logic to entity
-					monster.health -= projectile.damage;
-					monster.setEffect(Entities::Effect::Hit);
-					spawnNumber(projectile.damage, monster.position);
-					// @todo: Use instance color and timer to highlight hit monsters for a short duration
-					if (monster.health <= 0.0f) {
-						monster.state = Entities::State::Dead;
-						// @todo
-						Entities::Pickup xpPickup{};
-						xpPickup.type = Entities::Pickup::Type::Experience;
-						xpPickup.position = monster.position;
-						xpPickup.value = 10;
-						xpPickup.imageIndex = experienceImageIndex;
-						xpPickup.scale = 0.5f;
-						xpPickup.speed = player.speed * 2.0f;
-						spawnPickup(xpPickup);
-						audioManager->playSnd("enemydeath");
+	{
+		ZoneScopedN("Collision detection");
+		// Collision check
+		for (auto& projectile : projectiles) {
+			if (projectile.state == Entities::State::Dead) {
+				continue;
+			}
+			// @todo: effect on hit target
+			// @todo: move collision check to entity
+			if (projectile.source == Entities::Source::Player) {
+				for (auto& monster : monsters) {
+					if (monster.state == Entities::State::Dead) {
+						continue;
 					}
-					else {
-						audioManager->playSnd("enemyhit");
+					// @todo: Proper collision check
+					if (abs(glm::distance(monster.position, projectile.position)) < 1.0f) {
+						// @todo: Projectiles that can hit multiple enemies before "dying"
+						projectile.state = Entities::State::Dead;
+						// @todo: Move logic to entity
+						monster.health -= projectile.damage;
+						monster.setEffect(Entities::Effect::Hit);
+						spawnNumber(projectile.damage, monster.position);
+						// @todo: Use instance color and timer to highlight hit monsters for a short duration
+						if (monster.health <= 0.0f) {
+							monster.state = Entities::State::Dead;
+							// @todo
+							Entities::Pickup xpPickup{};
+							xpPickup.type = Entities::Pickup::Type::Experience;
+							xpPickup.position = monster.position;
+							xpPickup.value = 10;
+							xpPickup.imageIndex = experienceImageIndex;
+							xpPickup.scale = 0.5f;
+							xpPickup.speed = player.speed * 2.0f;
+							spawnPickup(xpPickup);
+							audioManager->playSnd("enemydeath");
+						}
+						else {
+							audioManager->playSnd("enemyhit");
+						}
+						if (projectile.state == Entities::State::Dead) {
+							continue;
+						}
 					}
 				}
 			}
 		}
 	}
 
-	for (auto& pickup : pickups) {
-		if (pickup.state == Entities::State::Dead) {
-			continue;
-		}
-		// Experience moves towards the player once he gets in pickup range
-		// @todo: Pickup range as property of player
-		if (pickup.type == Entities::Pickup::Type::Experience) {
-			if (glm::distance(pickup.position, player.position) < 3.0f) {
-				pickup.direction = glm::normalize(player.position - pickup.position);
-				// @todo: pickup speed adjustments
-				pickup.position += pickup.direction * pickup.speed * delta;
-				// @todo: Proper collision check
-				if (glm::distance(player.position, pickup.position) < 1.0f) {
-					pickup.state = Entities::State::Dead;
-					player.addExperience(pickup.value);
-					audioManager->playSnd("pickupxp");
+	{
+		ZoneScopedN("Entity updates");
+
+
+		for (auto& pickup : pickups) {
+			if (pickup.state == Entities::State::Dead) {
+				continue;
+			}
+			// Experience moves towards the player once he gets in pickup range
+			// @todo: Pickup range as property of player
+			if (pickup.type == Entities::Pickup::Type::Experience) {
+				if (glm::distance(pickup.position, player.position) < 3.0f) {
+					pickup.direction = glm::normalize(player.position - pickup.position);
+					// @todo: pickup speed adjustments
+					pickup.position += pickup.direction * pickup.speed * delta;
+					// @todo: Proper collision check
+					if (glm::distance(player.position, pickup.position) < 1.0f) {
+						pickup.state = Entities::State::Dead;
+						player.addExperience(pickup.value);
+						audioManager->playSnd("pickupxp");
+					}
 				}
 			}
 		}
-	}
 
-	for (auto i = 0; i < projectiles.size(); i++) {
-		Entities::Projectile& projectile = projectiles[i];
-		projectile.position += projectile.direction * projectile.speed * delta;
-		projectile.life -= delta * 50.0f;
-		if (projectile.life <= 0.0f) {
-			projectile.state = Entities::State::Dead;
+		for (auto i = 0; i < projectiles.size(); i++) {
+			Entities::Projectile& projectile = projectiles[i];
+			projectile.position += projectile.direction * projectile.speed * delta;
+			projectile.life -= delta * 50.0f;
+			if (projectile.life <= 0.0f) {
+				projectile.state = Entities::State::Dead;
+			}
 		}
-	}
 
-	for (auto i = 0; i < numbers.size(); i++) {
-		Entities::Number& number = numbers[i];
-		number.position += number.direction * number.speed * delta;
-		number.life -= delta * 50.0f;
-		if (number.life <= 0.0f) {
-			number.state = Entities::State::Dead;
+		for (auto i = 0; i < numbers.size(); i++) {
+			Entities::Number& number = numbers[i];
+			number.position += number.direction * number.speed * delta;
+			number.life -= delta * 50.0f;
+			if (number.life <= 0.0f) {
+				number.state = Entities::State::Dead;
+			}
+		}
+
+		for (auto i = 0; i < monsters.size(); i++) {
+			Entities::Monster& monster = monsters[i];
+			// @todo: simple "logic" for testing
+			// @todo: Use velocity
+			// Monsters far away respawn outside of the view
+			monster.update(delta);
+			if (glm::length(player.position - monster.position) > playFieldSize.x * 3.0f) {
+				monsterSpawnPosition(monster);
+			};
+			monster.direction = glm::normalize(player.position - monster.position);
+			monster.position += monster.direction * monster.speed * delta;
 		}
 	}
 
@@ -208,19 +233,6 @@ void Game::Game::update(float delta)
 	if (spawnTriggerTimer > spawnTriggerDuration) {
 		spawnTriggerTimer = 0.0f;
 		spawnMonsters(spawnTriggerMonsterCount);
-	}
-
-	for (auto i = 0; i < monsters.size(); i++) {
-		Entities::Monster& monster = monsters[i];
-		// @todo: simple "logic" for testing
-		// @todo: Use velocity
-		// Monsters far away respawn outside of the view
-		monster.update(delta);
-		if (glm::length(player.position - monster.position) > playFieldSize.x * 3.0f) {
-			monsterSpawnPosition(monster);
-		};
-		monster.direction = glm::normalize(player.position - monster.position);
-		monster.position += monster.direction * monster.speed * delta;
 	}
 }
 

@@ -10,6 +10,7 @@
 #include <random>
 #include "time.h"
 #include <SFML/Window.hpp>
+#include <tracy/Tracy.hpp>
 
 #include "object_types/Monsters.hpp"
 #include "entities/Entity.hpp"
