@@ -1,7 +1,7 @@
 /*
  * Vulkan descriptor set abstraction class
  *
- * Copyright (C) 2023-2024 by Sascha Willems - www.saschawillems.de
+ * Copyright (C) 2023-2025 by Sascha Willems - www.saschawillems.de
  *
  * This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
  */
@@ -32,6 +32,9 @@ public:
 
 	DescriptorSet(DescriptorSetCreateInfo createInfo) {
 		descriptors = createInfo.descriptors;
+		for (auto& descriptor : descriptors) {
+			descriptor.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		}
 		VkDescriptorSetAllocateInfo descriptorSetAI = vks::initializers::descriptorSetAllocateInfo(createInfo.pool->handle, createInfo.layouts.data(), static_cast<uint32_t>(createInfo.layouts.size()));
 		VkDescriptorSetVariableDescriptorCountAllocateInfo variableDescriptorCountAI = {};
 		variableDescriptorCountAI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
