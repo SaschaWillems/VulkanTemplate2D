@@ -60,6 +60,8 @@ struct InstanceData {
 	float scale{ 1.0f };
 	uint32_t imageIndex{ 0 };
 	uint32_t effect{ 0 };
+	uint32_t pad0;
+	uint32_t pad1;
 };
 
 struct TileMap {
@@ -118,7 +120,6 @@ private:
 	std::unordered_map<std::string, PipelineLayout*> pipelineLayouts;
 	std::unordered_map<std::string, Pipeline*> pipelines;
 	sf::Music backgroundMusic;
-	Buffer* quadBuffer{ nullptr };
 	glm::vec2 screenDim{ 0.0f };
 public:	
 	Application() : VulkanApplication() {
@@ -185,7 +186,6 @@ public:
 			backgroundMusic.stop();
 		}
 		delete audioManager;
-		delete quadBuffer;
 	}
 
 	void loadTexture(const std::string filename, uint32_t& index)
@@ -372,49 +372,7 @@ public:
 			}
 		});
 	}
-
-	void generateQuad()
-	{
-		std::vector<Vertex> vertices =
-		{
-			{ {  1.0f,  1.0f, 0.0f }, { 1.0f, 1.0f } },
-			{ { -1.0f,  1.0f, 0.0f }, { 0.0f, 1.0f } },
-			{ { -1.0f, -1.0f, 0.0f }, { 0.0f, 0.0f } },
-
-			{ { -1.0f, -1.0f, 0.0f }, { 0.0f, 0.0f } },
-			{ {  1.0f, -1.0f, 0.0f }, { 1.0f, 0.0f } },
-			{ {  1.0f,  1.0f, 0.0f }, { 1.0f, 1.0f } },
-		};
-
-		const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
-
-		// Stage to device
-		Buffer* stagingBuffer = new Buffer({
-			.usageFlags = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-			.size = vertexBufferSize,
-			.data = vertices.data()
-		});
-
-		quadBuffer = new Buffer({
-			.usageFlags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			.size = vertexBufferSize,
-		});
-
-		CommandBuffer* cb = new CommandBuffer({
-			.device = *vulkanDevice,
-			.pool = commandPool
-		});
-
-		cb->begin();
-		VkBufferCopy bufferCopy = { .size = vertexBufferSize };
-		vkCmdCopyBuffer(cb->handle, stagingBuffer->buffer, quadBuffer->buffer, 1, &bufferCopy);
-		cb->end();
-		cb->oneTimeSubmit(queue);
-		delete cb;
-		
-		delete stagingBuffer;
-	}
-
+	
 	void updateInstanceBuffer(FrameObjects& frame) {
 		const uint32_t maxInstanceCount = 
 			static_cast<uint32_t>(game.monsters.size()) +
@@ -423,6 +381,7 @@ public:
 			// @todo: Max. 3 digits per number for now
 			(static_cast<uint32_t>(game.numbers.size()) * 3) +
 			1;
+
 
 		// Only recreate buffer if necessary, resizing is done in "chunks" to avoid frequent resizes
 		const int32_t minInstanceBufferCount = std::max(maxInstanceCount + instanceBufferBlockSizeIncrease - 1 - (maxInstanceCount + instanceBufferBlockSizeIncrease - 1) % instanceBufferBlockSizeIncrease, instanceBufferBlockSizeIncrease);
@@ -434,10 +393,12 @@ public:
 			// Device
 			delete frame.instanceBuffer;
 			frame.instanceBuffer = new Buffer({
-				.usageFlags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				.usageFlags = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
 				.size = minInstanceBufferCount * sizeof(InstanceData)
 			});
 			frame.instanceBufferMaxCount = minInstanceBufferCount;
+			// @todo
+			frame.descriptorSet->updateDescriptor(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &frame.instanceBuffer->descriptor);
 		}
 
 		// Gather instances to be drawn
@@ -451,7 +412,7 @@ public:
 			}
 			InstanceData& instance = frame.instances[instanceIndex++];
 			instance.imageIndex = monster.imageIndex;
-			instance.pos = glm::vec3(monster.position, 0.0f);
+			instance.pos = glm::vec4(monster.position, 0.0f, 0.0f);
 			instance.scale = monster.scale;
 			instance.effect = static_cast<uint32_t>(monster.effect);
 		}
@@ -464,7 +425,7 @@ public:
 			}
 			InstanceData& instance = frame.instances[instanceIndex++];
 			instance.imageIndex = projectile.imageIndex;
-			instance.pos = glm::vec3(projectile.position, 0.0f);
+			instance.pos = glm::vec4(projectile.position, 0.0f, 0.0f);
 			instance.scale = projectile.scale;
 			instance.effect = static_cast<uint32_t>(projectile.effect);
 		}
@@ -477,7 +438,7 @@ public:
 			}
 			InstanceData& instance = frame.instances[instanceIndex++];
 			instance.imageIndex = pickup.imageIndex;
-			instance.pos = glm::vec3(pickup.position, 0.0f);
+			instance.pos = glm::vec4(pickup.position, 0.0f, 0.0f);
 			instance.scale = pickup.scale;
 			instance.effect = static_cast<uint32_t>(pickup.effect);
 		}
@@ -494,7 +455,7 @@ public:
 				const char v = number.stringValue[i];
 				instance.imageIndex = game.firstNumberImageIndex + std::atoi(&v);
 				// @todo: center
-				instance.pos = glm::vec3(number.position + glm::vec2(i * number.scale * 0.75f, 0.0f), 0.0f);
+				instance.pos = glm::vec4(number.position + glm::vec2(i * number.scale * 0.75f, 0.0f), 0.0f, 0.0f);
 				instance.scale = number.scale;
 				instance.effect = static_cast<uint32_t>(number.effect);
 			}
@@ -502,7 +463,7 @@ public:
 
 		// Player
 		frame.instances[instanceIndex] = {
-			.pos = glm::vec3(game.player.position, 0.0f),
+			.pos = glm::vec4(game.player.position, 0.0f, 0.0f),
 			.scale = game.player.scale,
 			.imageIndex = game.player.imageIndex,
 			.effect = static_cast<uint32_t>(game.player.effect)
@@ -542,7 +503,6 @@ public:
 		game.playFieldSize = screenDim;
 
 		loadAssets();
-		generateQuad();
 		createTileMap();
 
 		game.player.speed = 5.0f;
@@ -577,6 +537,7 @@ public:
 //			.maxSets = getFrameCount() + 2,
 			.poolSizes = {
 				{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 8 /*getFrameCount()*/ },
+				{.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 8 /*getFrameCount()*/ },
 				{.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = 4096 /*@todo*/},
 				{.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 256 /*@todo*/},
 			}
@@ -584,7 +545,8 @@ public:
 
 		descriptorSetLayoutUniforms = new DescriptorSetLayout({
 			.bindings = {
-				{.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT }
+				{.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT },
+				{.binding = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_VERTEX_BIT }
 			}
 		});
 
@@ -593,7 +555,7 @@ public:
 				.pool = descriptorPool,
 				.layouts = { descriptorSetLayoutUniforms->handle },
 				.descriptors = {
-					{.dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .pBufferInfo = &frame.uniformBuffer->descriptor }
+					{.dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .pBufferInfo = &frame.uniformBuffer->descriptor },
 				}
 			});
 		}
@@ -616,22 +578,6 @@ public:
 			.layouts = { descriptorSetLayoutTextures->handle, descriptorSetLayoutSamplers->handle, descriptorSetLayoutUniforms->handle },
 		});
 
-		PipelineVertexInput vertexInput = {
-			.bindings = {
-				{ .binding = 0, .stride = sizeof(Vertex), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX },
-				{ .binding = 1, .stride = sizeof(InstanceData), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE }
-			},
-			.attributes = {
-				{ .location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, pos) },
-				{ .location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vertex, uv) },
-				// Instanced
-				{ .location = 2, .binding = 1, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(InstanceData, pos) },
-				{ .location = 3, .binding = 1, .format = VK_FORMAT_R32_SFLOAT, .offset = offsetof(InstanceData, scale) },
-				{ .location = 4, .binding = 1, .format = VK_FORMAT_R32_SINT, .offset = offsetof(InstanceData, imageIndex) },
-				{ .location = 5, .binding = 1, .format = VK_FORMAT_R32_SINT, .offset = offsetof(InstanceData, effect) },
-			}
-		};
-
 		pipelines["sprite"] = new Pipeline({
 			.shaders = {
 				getAssetPath() + "shaders/sprite.vert.hlsl",
@@ -639,7 +585,6 @@ public:
 			},
 			.cache = pipelineCache,
 			.layout = *pipelineLayouts["sprite"],
-			.vertexInput = vertexInput,
 			.inputAssemblyState = {
 				.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
 			},
@@ -850,13 +795,10 @@ public:
 		cb->bindDescriptorSets(pipelineLayouts["tilemap"], { descriptorSetTextures, tileMap.descriptorSetSampler, frame.descriptorSet });
 		cb->bindPipeline(pipelines["tilemap"]);
 		cb->updatePushConstant(pipelineLayouts["tilemap"], 0, &pushConsts);
-		cb->draw(3, 1, 0, 0);
+		cb->draw(6, 1, 0, 0);
 
 		// Draw sprites using instancing
-		// Instancing buffer stores sprite index, position, scale, direction (to flip/rotate) uv, maybe color for health state
-
-		cb->bindVertexBuffers(0, 1, { quadBuffer->buffer });
-		cb->bindVertexBuffers(1, 1, { frame.instanceBuffer->buffer });
+		// A shader storage buffer stores sprite index, position, scale, direction (to flip/rotate) uv, maybe color for health state
 		cb->bindDescriptorSets(pipelineLayouts["sprite"], { descriptorSetTextures, descriptorSetSamplers, frame.descriptorSet });
 		cb->bindPipeline(pipelines["sprite"]);
 		cb->draw(6, frame.instanceBufferDrawCount, 0, 0);

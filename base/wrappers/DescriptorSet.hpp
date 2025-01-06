@@ -32,6 +32,9 @@ public:
 
 	DescriptorSet(DescriptorSetCreateInfo createInfo) {
 		descriptors = createInfo.descriptors;
+		for (auto& descriptor : descriptors) {
+			descriptor.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		}
 		VkDescriptorSetAllocateInfo descriptorSetAI = vks::initializers::descriptorSetAllocateInfo(createInfo.pool->handle, createInfo.layouts.data(), static_cast<uint32_t>(createInfo.layouts.size()));
 		VkDescriptorSetVariableDescriptorCountAllocateInfo variableDescriptorCountAI = {};
 		variableDescriptorCountAI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO;
@@ -92,5 +95,26 @@ public:
 				break;
 			}
 		}
+	}
+
+	void updateDescriptor(uint32_t binding, VkDescriptorType type, VkDescriptorBufferInfo* bufferInfo, uint32_t descriptorCount = 1) {
+		for (auto& descriptor : descriptors) {
+			if (descriptor.dstBinding == binding) {
+				descriptor.descriptorType = type;
+				descriptor.pBufferInfo = bufferInfo;
+				descriptor.descriptorCount = descriptorCount;
+				vkUpdateDescriptorSets(VulkanContext::device->logicalDevice, 1, &descriptor, 0, nullptr);
+				return;
+			}
+		}
+		VkWriteDescriptorSet writeDescriptorSet{};
+		writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writeDescriptorSet.descriptorType = type;
+		writeDescriptorSet.dstBinding = binding;
+		writeDescriptorSet.dstSet = handle;
+		writeDescriptorSet.pBufferInfo = bufferInfo;
+		writeDescriptorSet.descriptorCount = descriptorCount;
+		descriptors.push_back(writeDescriptorSet);
+		vkUpdateDescriptorSets(VulkanContext::device->logicalDevice, 1, &writeDescriptorSet, 0, nullptr);
 	}
 };
