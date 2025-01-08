@@ -23,6 +23,8 @@
 // @todo: sync2 everywhere
 // @todo: timeline semaphores
 
+#define USE_REBAR
+
 #ifdef TRACY_ENABLE
 void* operator new(size_t count)
 {
@@ -435,8 +437,18 @@ public:
 			delete frame.instanceBuffer;
 			frame.instanceBuffer = new Buffer({
 				.usageFlags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-				.size = minInstanceBufferCount * sizeof(InstanceData)
+				.size = minInstanceBufferCount * sizeof(InstanceData),
+#if defined(USE_REBAR)
+				.vmaAllocFlags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT,
+#endif
+				.map = true,
 			});
+#if defined(USE_REBAR)
+			VkMemoryPropertyFlags memPropFlags;
+			vmaGetAllocationMemoryProperties(VulkanContext::vmaAllocator, frame.instanceBuffer->bufferAllocation, &memPropFlags);
+			// @todo: fall back to staging if no ReBAR
+			assert(memPropFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+#endif
 			frame.instanceBufferMaxCount = minInstanceBufferCount;
 		}
 
@@ -513,10 +525,10 @@ public:
 		assert(frame.instanceBufferDrawCount > 0);
 
 		const size_t instanceBufferSize = frame.instanceBufferDrawCount * sizeof(InstanceData);
+#if defined(USE_REBAR)
+		memcpy(frame.instanceBuffer->mapped, &frame.instances[0], instanceBufferSize);
+#else
 		stagingBuffer->copyTo(frame.instances, instanceBufferSize);
-
-		frame.instanceBufferSize = instanceBufferSize;
-
 		if (!copyCommandBuffer) {
 			copyCommandBuffer = new CommandBuffer({ .device = *vulkanDevice, .pool = commandPool });
 		}
@@ -525,6 +537,8 @@ public:
 		vkCmdCopyBuffer(copyCommandBuffer->handle, stagingBuffer->buffer, frame.instanceBuffer->buffer, 1, &bufferCopy);
 		copyCommandBuffer->end();
 		copyCommandBuffer->oneTimeSubmit(queue);
+#endif
+		frame.instanceBufferSize = instanceBufferSize;
 	}
 
 	void prepare() {

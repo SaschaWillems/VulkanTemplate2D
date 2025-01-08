@@ -19,6 +19,7 @@ struct BufferCreateInfo {
 	const std::string name{ "" };
 	VkBufferUsageFlags usageFlags;
 	VkDeviceSize size;
+	uint32_t vmaAllocFlags{ 0 };
 	bool map{ false };
 	void* data{ nullptr };
 };
@@ -45,6 +46,9 @@ public:
 		else {
 			bufferAllocInfo.flags = VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
 			bufferAllocInfo.priority = 1.0f;
+		}
+		if (createInfo.vmaAllocFlags) {
+			bufferAllocInfo.flags = createInfo.vmaAllocFlags;
 		}
 		VK_CHECK_RESULT(vmaCreateBuffer(VulkanContext::vmaAllocator, &bufferCreateInfo, &bufferAllocInfo, &buffer, &bufferAllocation, nullptr));
 
