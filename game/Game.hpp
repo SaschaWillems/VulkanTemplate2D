@@ -11,6 +11,7 @@
 #include "time.h"
 #include <SFML/Window.hpp>
 #include <tracy/Tracy.hpp>
+#include <Threadpool.hpp>
 
 #include "object_types/Monsters.hpp"
 #include "entities/Entity.hpp"
@@ -27,6 +28,7 @@ namespace Game {
 
 	class Game {
 	private:
+		vks::ThreadPool threadPool;
 		void monsterSpawnPosition(Entities::Monster& monster);
 	public:
 		std::default_random_engine randomEngine;
@@ -62,6 +64,7 @@ namespace Game {
 		void spawnPickup(Entities::Pickup pickup);
 		void spawnNumber(uint32_t value, glm::vec2 position);
 
+		void monsterProjectileCollisionCheck(Entities::Monster& monster);
 		void update(float delta);
 		void updateInput(float delta);
 	};

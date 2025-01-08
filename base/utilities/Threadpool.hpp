@@ -1,7 +1,7 @@
 /*
 * Basic C++11 based thread pool with per-thread job queues
 *
-* Copyright (C) 2016 by Sascha Willems - www.saschawillems.de
+* Copyright (C) 2016-2025 by Sascha Willems - www.saschawillems.de
 *
 * This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
 */
@@ -26,7 +26,7 @@ namespace vks
 	class Thread
 	{
 	private:
-		bool destroying = false;
+		bool destroying{ false };
 		std::thread worker;
 		std::queue<std::function<void()>> jobQueue;
 		std::mutex queueMutex;

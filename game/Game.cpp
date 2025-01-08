@@ -18,6 +18,7 @@ void Game::Game::monsterSpawnPosition(Entities::Monster& monster)
 Game::Game::Game()
 {
 	randomEngine.seed((unsigned)time(nullptr));
+	threadPool.setThreadCount(8);
 }
 
 void Game::Game::spawnMonsters(uint32_t count)
@@ -108,6 +109,46 @@ void Game::Game::spawnNumber(uint32_t value, glm::vec2 position)
 	numbers.push_back(number);
 }
 
+void Game::Game::monsterProjectileCollisionCheck(Entities::Monster& monster)
+{
+	for (auto& projectile : projectiles) {
+		if (projectile.state == Entities::State::Dead) {
+			continue;
+		}
+		if (projectile.source == Entities::Source::Player) {
+			// @todo: Proper collision check
+			if (abs(glm::distance(monster.position, projectile.position)) < 1.0f) {
+				// @todo: Projectiles that can hit multiple enemies before "dying"
+				projectile.state = Entities::State::Dead;
+				// @todo: Move logic to entity
+				monster.health -= projectile.damage;
+				monster.setEffect(Entities::Effect::Hit);
+				spawnNumber(projectile.damage, monster.position);
+				// @todo: Use instance color and timer to highlight hit monsters for a short duration
+				if (monster.health <= 0.0f) {
+					monster.state = Entities::State::Dead;
+					// @todo
+					Entities::Pickup xpPickup{};
+					xpPickup.type = Entities::Pickup::Type::Experience;
+					xpPickup.position = monster.position;
+					xpPickup.value = 10;
+					xpPickup.imageIndex = experienceImageIndex;
+					xpPickup.scale = 0.5f;
+					xpPickup.speed = player.speed * 2.0f;
+					spawnPickup(xpPickup);
+					audioManager->playSnd("enemydeath");
+				}
+				else {
+					audioManager->playSnd("enemyhit");
+				}
+			}
+			//if (projectile.state == Entities::State::Dead) {
+			//	break;
+			//}
+		}
+	}
+}
+
 void Game::Game::update(float delta)
 {
 	// @todo: totally work in progress
@@ -123,6 +164,7 @@ void Game::Game::update(float delta)
 		audioManager->playSnd("laser");
 	}
 
+	/*
 	{
 		ZoneScopedN("Collision detection");
 		// Collision check
@@ -133,99 +175,160 @@ void Game::Game::update(float delta)
 			// @todo: effect on hit target
 			// @todo: move collision check to entity
 			if (projectile.source == Entities::Source::Player) {
-				for (auto& monster : monsters) {
-					if (monster.state == Entities::State::Dead) {
-						continue;
-					}
-					// @todo: Proper collision check
-					if (abs(glm::distance(monster.position, projectile.position)) < 1.0f) {
-						// @todo: Projectiles that can hit multiple enemies before "dying"
-						projectile.state = Entities::State::Dead;
-						// @todo: Move logic to entity
-						monster.health -= projectile.damage;
-						monster.setEffect(Entities::Effect::Hit);
-						spawnNumber(projectile.damage, monster.position);
-						// @todo: Use instance color and timer to highlight hit monsters for a short duration
-						if (monster.health <= 0.0f) {
-							monster.state = Entities::State::Dead;
-							// @todo
-							Entities::Pickup xpPickup{};
-							xpPickup.type = Entities::Pickup::Type::Experience;
-							xpPickup.position = monster.position;
-							xpPickup.value = 10;
-							xpPickup.imageIndex = experienceImageIndex;
-							xpPickup.scale = 0.5f;
-							xpPickup.speed = player.speed * 2.0f;
-							spawnPickup(xpPickup);
-							audioManager->playSnd("enemydeath");
-						}
-						else {
-							audioManager->playSnd("enemyhit");
-						}
-						if (projectile.state == Entities::State::Dead) {
-							continue;
-						}
-					}
-				}
+				//for (auto& monster : monsters) {
+				//	if (monster.state == Entities::State::Dead) {
+				//		continue;
+				//	}
+				//	// @todo: Proper collision check
+				//	if (abs(glm::distance(monster.position, projectile.position)) < 1.0f) {
+				//		// @todo: Projectiles that can hit multiple enemies before "dying"
+				//		projectile.state = Entities::State::Dead;
+				//		// @todo: Move logic to entity
+				//		monster.health -= projectile.damage;
+				//		monster.setEffect(Entities::Effect::Hit);
+				//		spawnNumber(projectile.damage, monster.position);
+				//		// @todo: Use instance color and timer to highlight hit monsters for a short duration
+				//		if (monster.health <= 0.0f) {
+				//			monster.state = Entities::State::Dead;
+				//			// @todo
+				//			Entities::Pickup xpPickup{};
+				//			xpPickup.type = Entities::Pickup::Type::Experience;
+				//			xpPickup.position = monster.position;
+				//			xpPickup.value = 10;
+				//			xpPickup.imageIndex = experienceImageIndex;
+				//			xpPickup.scale = 0.5f;
+				//			xpPickup.speed = player.speed * 2.0f;
+				//			spawnPickup(xpPickup);
+				//			audioManager->playSnd("enemydeath");
+				//		}
+				//		else {
+				//			audioManager->playSnd("enemyhit");
+				//		}
+				//	}
+				//	if (projectile.state == Entities::State::Dead) {
+				//		break;
+				//	}
+				//}
 			}
 		}
 	}
+	*/
 
 	{
 		ZoneScopedN("Entity updates");
 
-
-		for (auto& pickup : pickups) {
-			if (pickup.state == Entities::State::Dead) {
-				continue;
-			}
-			// Experience moves towards the player once he gets in pickup range
-			// @todo: Pickup range as property of player
-			if (pickup.type == Entities::Pickup::Type::Experience) {
-				if (glm::distance(pickup.position, player.position) < 3.0f) {
-					pickup.direction = glm::normalize(player.position - pickup.position);
-					// @todo: pickup speed adjustments
-					pickup.position += pickup.direction * pickup.speed * delta;
-					// @todo: Proper collision check
-					if (glm::distance(player.position, pickup.position) < 1.0f) {
-						pickup.state = Entities::State::Dead;
-						player.addExperience(pickup.value);
-						audioManager->playSnd("pickupxp");
+		threadPool.threads[0]->addJob([=] {
+			for (auto& pickup : pickups) {
+				if (pickup.state == Entities::State::Dead) {
+					continue;
+				}
+				// Experience moves towards the player once he gets in pickup range
+				// @todo: Pickup range as property of player
+				if (pickup.type == Entities::Pickup::Type::Experience) {
+					if (glm::distance(pickup.position, player.position) < 3.0f) {
+						pickup.direction = glm::normalize(player.position - pickup.position);
+						// @todo: pickup speed adjustments
+						pickup.position += pickup.direction * pickup.speed * delta;
+						// @todo: Proper collision check
+						if (glm::distance(player.position, pickup.position) < 1.0f) {
+							pickup.state = Entities::State::Dead;
+							player.addExperience(pickup.value);
+							audioManager->playSnd("pickupxp");
+						}
 					}
 				}
 			}
-		}
+		});
 
-		for (auto i = 0; i < projectiles.size(); i++) {
-			Entities::Projectile& projectile = projectiles[i];
-			projectile.position += projectile.direction * projectile.speed * delta;
-			projectile.life -= delta * 50.0f;
-			if (projectile.life <= 0.0f) {
-				projectile.state = Entities::State::Dead;
+		threadPool.threads[1]->addJob([=] { 
+			for (auto i = 0; i < projectiles.size(); i++) {
+				Entities::Projectile& projectile = projectiles[i];
+				projectile.position += projectile.direction * projectile.speed * delta;
+				projectile.life -= delta * 50.0f;
+				if (projectile.life <= 0.0f) {
+					projectile.state = Entities::State::Dead;
+				}
 			}
-		}
+		});
 
-		for (auto i = 0; i < numbers.size(); i++) {
-			Entities::Number& number = numbers[i];
-			number.position += number.direction * number.speed * delta;
-			number.life -= delta * 50.0f;
-			if (number.life <= 0.0f) {
-				number.state = Entities::State::Dead;
+		threadPool.threads[2]->addJob([=] {
+			for (auto i = 0; i < numbers.size(); i++) {
+				Entities::Number& number = numbers[i];
+				number.position += number.direction * number.speed * delta;
+				number.life -= delta * 50.0f;
+				if (number.life <= 0.0f) {
+					number.state = Entities::State::Dead;
+				}
 			}
-		}
+		});
 
-		for (auto i = 0; i < monsters.size(); i++) {
-			Entities::Monster& monster = monsters[i];
-			// @todo: simple "logic" for testing
-			// @todo: Use velocity
-			// Monsters far away respawn outside of the view
-			monster.update(delta);
-			if (glm::length(player.position - monster.position) > playFieldSize.x * 3.0f) {
-				monsterSpawnPosition(monster);
-			};
-			monster.direction = glm::normalize(player.position - monster.position);
-			monster.position += monster.direction * monster.speed * delta;
-		}
+		const auto mtSize = monsters.size() / 4;
+
+		threadPool.threads[3]->addJob([=] {
+			for (auto i = 0; i < mtSize; i++) {
+				Entities::Monster& monster = monsters[i];
+				// @todo: simple "logic" for testing
+				// @todo: Use velocity
+				// Monsters far away respawn outside of the view
+				monster.update(delta);
+				if (glm::length(player.position - monster.position) > playFieldSize.x * 3.0f) {
+					monsterSpawnPosition(monster);
+				};
+				monster.direction = glm::normalize(player.position - monster.position);
+				monster.position += monster.direction * monster.speed * delta;
+				monsterProjectileCollisionCheck(monster);
+			}
+		});
+
+		threadPool.threads[4]->addJob([=] {
+			for (auto i = mtSize; i < mtSize + mtSize; i++) {
+				Entities::Monster& monster = monsters[i];
+				// @todo: simple "logic" for testing
+				// @todo: Use velocity
+				// Monsters far away respawn outside of the view
+				monster.update(delta);
+				if (glm::length(player.position - monster.position) > playFieldSize.x * 3.0f) {
+					monsterSpawnPosition(monster);
+				};
+				monster.direction = glm::normalize(player.position - monster.position);
+				monster.position += monster.direction * monster.speed * delta;
+				monsterProjectileCollisionCheck(monster);
+			}
+		});
+
+		threadPool.threads[5]->addJob([=] {
+			for (auto i = mtSize + mtSize; i < mtSize + mtSize + mtSize; i++) {
+				Entities::Monster& monster = monsters[i];
+				// @todo: simple "logic" for testing
+				// @todo: Use velocity
+				// Monsters far away respawn outside of the view
+				monster.update(delta);
+				if (glm::length(player.position - monster.position) > playFieldSize.x * 3.0f) {
+					monsterSpawnPosition(monster);
+				};
+				monster.direction = glm::normalize(player.position - monster.position);
+				monster.position += monster.direction * monster.speed * delta;
+				monsterProjectileCollisionCheck(monster);
+			}
+		});
+
+		threadPool.threads[5]->addJob([=] {
+			for (auto i = mtSize + mtSize + mtSize; i < monsters.size(); i++) {
+				Entities::Monster& monster = monsters[i];
+				// @todo: simple "logic" for testing
+				// @todo: Use velocity
+				// Monsters far away respawn outside of the view
+				monster.update(delta);
+				if (glm::length(player.position - monster.position) > playFieldSize.x * 3.0f) {
+					monsterSpawnPosition(monster);
+				};
+				monster.direction = glm::normalize(player.position - monster.position);
+				monster.position += monster.direction * monster.speed * delta;
+				monsterProjectileCollisionCheck(monster);
+			}
+		});
+
+		threadPool.wait();
 	}
 
 	// Monster spawn
