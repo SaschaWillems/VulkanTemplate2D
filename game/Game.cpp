@@ -18,7 +18,7 @@ void Game::Game::monsterSpawnPosition(Entities::Monster& monster)
 Game::Game::Game()
 {
 	randomEngine.seed((unsigned)time(nullptr));
-	threadPool.setThreadCount(8);
+	threadPool.setThreadCount(std::thread::hardware_concurrency());
 }
 
 void Game::Game::spawnMonsters(uint32_t count)
@@ -262,71 +262,34 @@ void Game::Game::update(float delta)
 			}
 		});
 
-		const auto mtSize = monsters.size() / 4;
+		// @todo: set min. no of monsters per thread for lower monster counts
 
-		threadPool.threads[3]->addJob([=] {
-			for (auto i = 0; i < mtSize; i++) {
-				Entities::Monster& monster = monsters[i];
-				// @todo: simple "logic" for testing
-				// @todo: Use velocity
-				// Monsters far away respawn outside of the view
-				monster.update(delta);
-				if (glm::length(player.position - monster.position) > playFieldSize.x * 3.0f) {
-					monsterSpawnPosition(monster);
-				};
-				monster.direction = glm::normalize(player.position - monster.position);
-				monster.position += monster.direction * monster.speed * delta;
-				monsterProjectileCollisionCheck(monster);
-			}
-		});
+		const int32_t maxHardwareThreads = static_cast<int32_t>(std::thread::hardware_concurrency());
+		const auto maxMonsterThreads = std::max(maxHardwareThreads - 3, 1);
 
-		threadPool.threads[4]->addJob([=] {
-			for (auto i = mtSize; i < mtSize + mtSize; i++) {
-				Entities::Monster& monster = monsters[i];
-				// @todo: simple "logic" for testing
-				// @todo: Use velocity
-				// Monsters far away respawn outside of the view
-				monster.update(delta);
-				if (glm::length(player.position - monster.position) > playFieldSize.x * 3.0f) {
-					monsterSpawnPosition(monster);
-				};
-				monster.direction = glm::normalize(player.position - monster.position);
-				monster.position += monster.direction * monster.speed * delta;
-				monsterProjectileCollisionCheck(monster);
-			}
-		});
-
-		threadPool.threads[5]->addJob([=] {
-			for (auto i = mtSize + mtSize; i < mtSize + mtSize + mtSize; i++) {
-				Entities::Monster& monster = monsters[i];
-				// @todo: simple "logic" for testing
-				// @todo: Use velocity
-				// Monsters far away respawn outside of the view
-				monster.update(delta);
-				if (glm::length(player.position - monster.position) > playFieldSize.x * 3.0f) {
-					monsterSpawnPosition(monster);
-				};
-				monster.direction = glm::normalize(player.position - monster.position);
-				monster.position += monster.direction * monster.speed * delta;
-				monsterProjectileCollisionCheck(monster);
-			}
-		});
-
-		threadPool.threads[5]->addJob([=] {
-			for (auto i = mtSize + mtSize + mtSize; i < monsters.size(); i++) {
-				Entities::Monster& monster = monsters[i];
-				// @todo: simple "logic" for testing
-				// @todo: Use velocity
-				// Monsters far away respawn outside of the view
-				monster.update(delta);
-				if (glm::length(player.position - monster.position) > playFieldSize.x * 3.0f) {
-					monsterSpawnPosition(monster);
-				};
-				monster.direction = glm::normalize(player.position - monster.position);
-				monster.position += monster.direction * monster.speed * delta;
-				monsterProjectileCollisionCheck(monster);
-			}
-		});
+		const auto mtSize = monsters.size() / maxMonsterThreads;
+		for (auto t = 0; t < maxMonsterThreads; t++) {
+			threadPool.threads[3 + t]->addJob([=] {
+				const auto start = t * mtSize;
+				auto end = start + mtSize;
+				if (end > monsters.size()) {
+					end = monsters.size();
+				}
+				for (auto i = start; i < end; i++) {
+					Entities::Monster& monster = monsters[i];
+					// @todo: simple "logic" for testing
+					// @todo: Use velocity
+					// Monsters far away respawn outside of the view
+					monster.update(delta);
+					if (glm::length(player.position - monster.position) > playFieldSize.x * 3.0f) {
+						monsterSpawnPosition(monster);
+					};
+					monster.direction = glm::normalize(player.position - monster.position);
+					monster.position += monster.direction * monster.speed * delta;
+					monsterProjectileCollisionCheck(monster);
+				}
+			});
+		}
 
 		threadPool.wait();
 	}
