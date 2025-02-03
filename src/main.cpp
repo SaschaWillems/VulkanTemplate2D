@@ -440,8 +440,8 @@ public:
 				.size = minInstanceBufferCount * sizeof(InstanceData),
 #if defined(USE_REBAR)
 				.vmaAllocFlags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT,
-#endif
 				.map = true,
+#endif
 			});
 #if defined(USE_REBAR)
 			VkMemoryPropertyFlags memPropFlags;
