@@ -1,7 +1,7 @@
 /*
  * UI overlay class using ImGui
  *
- * Copyright (C) 2017-2024 by Sascha Willems - www.saschawillems.de
+ * Copyright (C) 2017-2025 by Sascha Willems - www.saschawillems.de
  *
  * This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
  */
@@ -225,8 +225,8 @@ namespace vks
 
 		pipeline = new Pipeline({
 			.shaders = {
-				assetPath + "shaders/base/overlay.vert.hlsl",
-				assetPath + "shaders/base/overlay.frag.hlsl"
+				.filename = assetPath + "shaders/base/overlay.slang",
+				.stages = { VK_SHADER_STAGE_VERTEX_BIT , VK_SHADER_STAGE_FRAGMENT_BIT}
 			},
 			.cache = pipelineCache,
 			.layout = *pipelineLayout,

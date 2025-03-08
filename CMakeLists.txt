@@ -18,6 +18,7 @@ include_directories(external/stb)
 include_directories(external/tracy)
 include_directories(external/ktx/include)
 include_directories(external/ktx/other_include)
+include_directories($ENV{VULKAN_SDK}/Include)
 include_directories(external/vma)
 include_directories(base/loaders)
 include_directories(base)
@@ -88,9 +89,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin/")
 add_subdirectory(base)
 add_subdirectory(src)
 add_subdirectory(game)
-# add_subdirectory(external)
 add_subdirectory(data\\shaders)
 
-target_link_libraries(VulkanTemplate
-	${CMAKE_CURRENT_SOURCE_DIR}/libs/dxcompiler.lib
-)
+target_link_libraries(VulkanTemplate $ENV{VULKAN_SDK}/Lib/slang.lib)

@@ -1,7 +1,7 @@
 /*
  * Vulkan pipeline abstraction class
  *
- * Copyright (C) 2023-2024 by Sascha Willems - www.saschawillems.de
+ * Copyright (C) 2023-2025 by Sascha Willems - www.saschawillems.de
  *
  * This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
  */
@@ -19,7 +19,7 @@
 #include "Initializers.hpp"
 #include "VulkanTools.h"
 #include "PipelineLayout.hpp"
-#include "dxc.hpp"
+#include "slang.hpp"
 
 enum class DynamicState { Viewport, Scissor };
 
@@ -28,11 +28,13 @@ struct PipelineVertexInput {
 	std::vector<VkVertexInputAttributeDescription> attributes{};
 };
 
-// @todo: add name (to all kind of wrapped objects)
 struct PipelineCreateInfo {
 	const std::string name{ "" };
 	VkPipelineBindPoint bindPoint{ VK_PIPELINE_BIND_POINT_GRAPHICS };
-	std::vector<std::string> shaders{};
+	struct {
+		std::string filename;
+		std::vector<VkShaderStageFlagBits> stages{};
+	} shaders;
 	VkPipelineCache cache{ VK_NULL_HANDLE };
 	VkPipelineLayout layout;
 	VkPipelineCreateFlags flags;
@@ -54,33 +56,32 @@ struct PipelineCreateInfo {
 class Pipeline : public DeviceResource {
 private:
 	VkPipeline handle{ VK_NULL_HANDLE };
-	std::vector<VkShaderModule> shaderModules{};
-	std::vector<VkPipelineShaderStageCreateInfo> shaderStages{};
-
-	void addShader(const std::string filename) {
-		// @todo: also support GLSL? Or jut drop it? And what about Android?
-		try {
-			assert(dxcCompiler);
-			VkShaderModule shaderModule = dxcCompiler->compileShader(filename);
-			VkShaderStageFlagBits shaderStage = dxcCompiler->getShaderStage(filename);
-			shaderModules.push_back(shaderModule);
-			VkPipelineShaderStageCreateInfo shaderStageCI{};
-			shaderStageCI.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			shaderStageCI.stage = shaderStage;
-			shaderStageCI.module = shaderModule;
-			shaderStageCI.pName = "main";
-			shaderStages.push_back(shaderStageCI);
-		} catch (...) {
-			throw;
-		}
-	}
 	
 	void createPipelineObject(PipelineCreateInfo createInfo) {
-		shaderStages.clear();
-		shaderModules.clear();
+		std::vector<VkPipelineShaderStageCreateInfo> shaderStages{};
+		Slang::ComPtr<slang::ISession> session = slangCompiler->createSession();
+
+		// Slang allows for all shader stages to be stored in a single file
+		VkShaderModule shaderModule{ VK_NULL_HANDLE };
 		try {
-			for (auto& filename : createInfo.shaders) {
-				addShader(filename);
+			Slang::ComPtr<slang::IModule> slangModule{ session->loadModuleFromSource(createInfo.name.c_str(), createInfo.shaders.filename.c_str(), nullptr, nullptr) };
+			Slang::ComPtr<ISlangBlob> spirv;
+			slangModule->getTargetCode(0, spirv.writeRef());
+
+			VkShaderModuleCreateInfo shaderModuleCI{};
+			shaderModuleCI.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+			shaderModuleCI.codeSize = spirv->getBufferSize();
+			shaderModuleCI.pCode = (uint32_t*)spirv->getBufferPointer();
+			VkShaderModule shaderModule;
+			vkCreateShaderModule(VulkanContext::device->logicalDevice, &shaderModuleCI, nullptr, &shaderModule);
+
+			VkPipelineShaderStageCreateInfo shaderStageCI{};
+			shaderStageCI.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+			shaderStageCI.module = shaderModule;
+			shaderStageCI.pName = "main";
+			for (auto& stage : createInfo.shaders.stages) {
+				shaderStageCI.stage = stage;
+				shaderStages.push_back(shaderStageCI);
 			}
 		}
 		catch (...) {
@@ -140,10 +141,7 @@ private:
 
 		VK_CHECK_RESULT(vkCreateGraphicsPipelines(VulkanContext::device->logicalDevice, createInfo.cache, 1, &pipelineCI, nullptr, &handle));
 	
-		// Shader modules can be safely destroyed after pipeline creation
-		for (auto& shaderModule : shaderModules) {
-			vkDestroyShaderModule(VulkanContext::device->logicalDevice, shaderModule, nullptr);
-		}
+		vkDestroyShaderModule(VulkanContext::device->logicalDevice, shaderModule, nullptr);
 
 		bindPoint = createInfo.bindPoint;
 	}

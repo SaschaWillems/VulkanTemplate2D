@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2024 by Sascha Willems - www.saschawillems.de
+ * Copyright (C) 2023-2025 by Sascha Willems - www.saschawillems.de
  *
  * This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
  */
@@ -23,7 +23,7 @@
 // @todo: sync2 everywhere
 // @todo: timeline semaphores
 
-#define USE_REBAR
+#define _USE_REBAR
 
 #ifdef TRACY_ENABLE
 void* operator new(size_t count)
@@ -43,8 +43,7 @@ void operator delete(void* ptr) noexcept
 std::vector<Pipeline*> pipelineList{};
 
 struct ShaderData {
-	glm::mat4 projection;
-	glm::mat4 view;
+	glm::mat4 mvp;
 	float time{ 0.0f };
 	float timer{ 0.0f };
 	float tileMapSpeed;
@@ -98,7 +97,7 @@ private:
 	};
 	// One large staging buffer that's reused for all copies
 	// @todo: per frame?
-	const size_t stagingBufferSize = 32 * 1024 * 1024;
+	const size_t stagingBufferSize = 64 * 1024 * 1024;
 	Buffer* stagingBuffer{ nullptr };
 	CommandBuffer* copyCommandBuffer{ nullptr };
 
@@ -141,12 +140,12 @@ public:
 
 		audioManager = new AudioManager();
 
-		dxcCompiler = new Dxc();
+		slangCompiler = new SlangCompiler();
 
 		// @todo: absolute or relative?
 		const float aspectRatio = (float)width / (float)height;
 		screenDim = glm::vec2(25.0f/* * aspectRatio*/, 25.0f);
-		shaderData.projection = glm::ortho(-screenDim.x, screenDim.x, -screenDim.x, screenDim.x);
+		//shaderData.projection = glm::ortho(-screenDim.x, screenDim.x, -screenDim.x, screenDim.x);
 
 		title = "Bindless Survivors";
 
@@ -188,6 +187,8 @@ public:
 		}
 		delete audioManager;
 		delete quadBuffer;
+
+		delete slangCompiler;
 	}
 
 	void loadTexture(const std::string filename, uint32_t& index)
@@ -251,6 +252,7 @@ public:
 			.name = "Sprite sampler",
 			.magFilter = VK_FILTER_NEAREST,
 			.minFilter = VK_FILTER_NEAREST,
+			.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST,
 			.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
 			.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
 		};
@@ -296,6 +298,7 @@ public:
 				tileType = rndTile(game.randomEngine);
 				tileCounter = 0;
 			}
+			//tileType = rndTile(game.randomEngine);
 			texBuffer[i] = tileType;
 			tileCounter++;
 		}
@@ -412,7 +415,7 @@ public:
 		vkCmdCopyBuffer(cb->handle, stagingBuffer->buffer, quadBuffer->buffer, 1, &bufferCopy);
 		cb->end();
 		cb->oneTimeSubmit(queue);
-		delete cb;
+		delete cb;		
 		
 		delete stagingBuffer;
 	}
@@ -648,8 +651,8 @@ public:
 
 		pipelines["sprite"] = new Pipeline({
 			.shaders = {
-				getAssetPath() + "shaders/sprite.vert.hlsl",
-				getAssetPath() + "shaders/sprite.frag.hlsl"
+				.filename = getAssetPath() + "shaders/sprite.slang",
+				.stages = { VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT }
 			},
 			.cache = pipelineCache,
 			.layout = *pipelineLayouts["sprite"],
@@ -693,8 +696,6 @@ public:
  		pipelineList.push_back(pipelines["sprite"]);
 
 		// Tilemap
-
-
 		pipelineLayouts["tilemap"] = new PipelineLayout({
 			.layouts = { descriptorSetLayoutTextures->handle, descriptorSetLayoutSamplers->handle, descriptorSetLayoutUniforms->handle },
 			// Index of the tilemap is passed via push constant, tile set starts at that index + 1
@@ -705,8 +706,8 @@ public:
 
 		pipelines["tilemap"] = new Pipeline({
 			.shaders = {
-				getAssetPath() + "shaders/tilemap.vert.hlsl",
-				getAssetPath() + "shaders/tilemap.frag.hlsl"
+				.filename = getAssetPath() + "shaders/tilemap.slang",
+				.stages = { VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT }
 			},
 			.cache = pipelineCache,
 			.layout = *pipelineLayouts["tilemap"],
@@ -920,7 +921,8 @@ public:
 
 		shaderData.timer = timer;
 		//shaderData.view = glm::mat4(1.0f);
-		shaderData.view = glm::translate(glm::mat4(1.0f), -glm::vec3(game.player.position / screenDim, 0.0f));
+		shaderData.mvp = glm::translate(glm::mat4(1.0f), -glm::vec3(game.player.position / screenDim, 0.0f));
+		shaderData.mvp *= glm::ortho(-screenDim.x, screenDim.x, -screenDim.x, screenDim.x);
 		shaderData.tileMapSpeed = tileMapSpeed;
 		memcpy(currentFrame.uniformBuffer->mapped, &shaderData, sizeof(ShaderData)); // @todo: buffer function
 
