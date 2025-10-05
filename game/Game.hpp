@@ -43,12 +43,14 @@ namespace Game {
 
 		glm::vec2 playFieldSize;
 
-		//
+		// @todo: Move these to a global header file
 		float spawnTriggerTimer{ 0.0f };
 		// Will be lowered with increasing game duration
 		float spawnTriggerDuration{ 100.0f };
 		// Will be increased with increasing game duration
 		uint32_t spawnTriggerMonsterCount{ 16 };
+		// Chance that an enemy spawns as a boss (in percent) 
+		int spawnBossChance{ 1 };
 
 		// @todo
 		uint32_t projectileImageIndex;

@@ -1,5 +1,5 @@
 /*
-* Copyright(C) 2024 by Sascha Willems - www.saschawillems.de
+* Copyright(C) 2024-2025 by Sascha Willems - www.saschawillems.de
 *
 * This code is licensed under the MIT license(MIT) (http://opensource.org/licenses/MIT)
 */
@@ -29,6 +29,7 @@ void Game::Game::spawnMonsters(uint32_t count)
 	std::uniform_real_distribution<float> dirDist(-1.0f, 1.0f);
 	std::uniform_real_distribution<float> speedDist(0.5f, 2.5f);
 	std::uniform_real_distribution<float> scaleDist(0.5f, 1.0f);
+	std::uniform_int_distribution<uint32_t> bossDist(0, 100);
 
 	// Spawn in a ring centered at the player position
 	for (auto i = 0; i < count; i++) {
@@ -42,6 +43,14 @@ void Game::Game::spawnMonsters(uint32_t count)
 		m.imageIndex = monster.imageIndex;
 		m.speed = speedDist(randomEngine);
 		m.scale = scaleDist(randomEngine);
+
+		// Randomly spawn a huge boss
+		if (bossDist(randomEngine) >= 100 - spawnBossChance) {
+			m.isBoss = true;
+			// @todo: scale with level
+			m.health = 250.0f;
+			m.scale = scaleDist(randomEngine) * 2.5f;
+		}
 		
 		// Replace dead monsters first
 		for (auto& mon : monsters) {
@@ -117,7 +126,7 @@ void Game::Game::monsterProjectileCollisionCheck(Entities::Monster& monster)
 		}
 		if (projectile.source == Entities::Source::Player) {
 			// @todo: Proper collision check
-			if (abs(glm::distance(monster.position, projectile.position)) < 1.0f) {
+			if (abs(glm::distance(monster.position, projectile.position)) < monster.scale) {
 				// @todo: Projectiles that can hit multiple enemies before "dying"
 				projectile.state = Entities::State::Dead;
 				// @todo: Move logic to entity
@@ -135,6 +144,10 @@ void Game::Game::monsterProjectileCollisionCheck(Entities::Monster& monster)
 					xpPickup.imageIndex = experienceImageIndex;
 					xpPickup.scale = 0.5f;
 					xpPickup.speed = player.speed * 2.0f;
+					if (monster.isBoss) {
+						xpPickup.value = 100;
+						xpPickup.scale = 1.5f;
+					}
 					spawnPickup(xpPickup);
 					audioManager->playSnd("enemydeath");
 				}
