@@ -25,6 +25,7 @@ namespace Game {
 		enum class Effect {
 			None = 0,
 			Hit = 1,
+			Critical = 2
 		};
 
 		class Entity {

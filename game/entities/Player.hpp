@@ -14,6 +14,8 @@ namespace Game {
 		public:
 			float experience;
 			uint32_t level;
+			float criticalChance{ 5.0f };
+			float criticalDamageMultiplier{ 1.5f };
 			void addExperience(float value);
 		};
 	}

@@ -64,7 +64,7 @@ namespace Game {
 		void spawnMonsters(uint32_t count);
 		void spawnProjectile(Entities::Source source, uint32_t imageIndex, glm::vec2 position, glm::vec2 direction);
 		void spawnPickup(Entities::Pickup pickup);
-		void spawnNumber(uint32_t value, glm::vec2 position);
+		void spawnNumber(uint32_t value, glm::vec2 position, Entities::Effect effect = Entities::Effect::None);
 
 		void monsterProjectileCollisionCheck(Entities::Monster& monster);
 		void update(float delta);

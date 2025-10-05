@@ -100,7 +100,7 @@ void Game::Game::spawnPickup(Entities::Pickup pickup)
 	pickups.push_back(pickup);
 }
 
-void Game::Game::spawnNumber(uint32_t value, glm::vec2 position)
+void Game::Game::spawnNumber(uint32_t value, glm::vec2 position, Entities::Effect effect)
 {
 	// @todo: grow in chunks
 	Entities::Number number{};
@@ -108,6 +108,10 @@ void Game::Game::spawnNumber(uint32_t value, glm::vec2 position)
 	number.direction = glm::vec2(0.f, -1.0f);
 	number.life = 100.0f;
 	number.setValue(value);
+	if (effect != Entities::Effect::None) {
+		number.setEffect(effect);
+		number.scale *= 1.5f;
+	}
 	// Replace unused numbers first
 	for (auto& num : numbers) {
 		if (num.state == Entities::State::Dead) {
@@ -120,6 +124,7 @@ void Game::Game::spawnNumber(uint32_t value, glm::vec2 position)
 
 void Game::Game::monsterProjectileCollisionCheck(Entities::Monster& monster)
 {
+	std::uniform_real_distribution<float> critDist(0.0, 100.0f);
 	for (auto& projectile : projectiles) {
 		if (projectile.state == Entities::State::Dead) {
 			continue;
@@ -130,9 +135,15 @@ void Game::Game::monsterProjectileCollisionCheck(Entities::Monster& monster)
 				// @todo: Projectiles that can hit multiple enemies before "dying"
 				projectile.state = Entities::State::Dead;
 				// @todo: Move logic to entity
-				monster.health -= projectile.damage;
+				float damage = projectile.damage;
+				// @todo: Move elsewhere
+				if (critDist(randomEngine) <= player.criticalChance) {
+					damage *= player.criticalDamageMultiplier;
+					projectile.effect = Entities::Effect::Critical;
+				}
+				monster.health -= damage;
 				monster.setEffect(Entities::Effect::Hit);
-				spawnNumber(projectile.damage, monster.position);
+				spawnNumber(damage, monster.position, projectile.effect);
 				// @todo: Use instance color and timer to highlight hit monsters for a short duration
 				if (monster.health <= 0.0f) {
 					monster.state = Entities::State::Dead;

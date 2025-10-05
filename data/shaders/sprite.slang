@@ -51,8 +51,14 @@ VSOutput main(VSInput input)
     output.textureIndex = input.instanceTextureIndex;
     if (input.instanceEffect == 1)
     {
+        // Highliight
         output.color = float4(20.0, 20.0, 20.0, 1.0);
     }
+    else if (input.instanceEffect == 2)
+    {
+        // Crit
+        output.color = float4(1.0, 0.0, 0.0, 1.0);
+    } 
     else
     {
         output.color = float4((1.0).rrrr);
