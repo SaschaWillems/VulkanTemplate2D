@@ -33,6 +33,11 @@ include_directories(game)
 OPTION(USE_D2D_WSI "Build the project using Direct to Display swapchain" OFF)
 OPTION(USE_WAYLAND_WSI "Build the project using Wayland swapchain" OFF)
 
+SET(SLANG_COMPILER_LIBRARY "" CACHE FILEPATH "")
+IF(NOT EXISTS ${SLANG_COMPILER_LIBRARY}) 
+	message(FATAL_ERROR "Slang compiler library not set")
+ENDIF()
+
 IF(WIN32)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DVK_USE_PLATFORM_WIN32_KHR")
 ELSE(WIN32)
@@ -91,4 +96,4 @@ add_subdirectory(src)
 add_subdirectory(game)
 add_subdirectory(data\\shaders)
 
-target_link_libraries(VulkanTemplate $ENV{VULKAN_SDK}/Lib/slang.lib)
+target_link_libraries(VulkanTemplate ${SLANG_COMPILER_LIBRARY})
