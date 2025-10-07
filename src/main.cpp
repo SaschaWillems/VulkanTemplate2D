@@ -114,8 +114,10 @@ private:
 	DescriptorSetLayout* descriptorSetLayoutUniforms;
 	DescriptorSetLayout* descriptorSetLayoutSamplers;
 	DescriptorSetLayout* descriptorSetLayoutTextures;
+	DescriptorSetLayout* descriptorSetLayoutRenderImage;
 	DescriptorSet* descriptorSetTextures;
 	DescriptorSet* descriptorSetSamplers;
+	DescriptorSet* descriptorSetRenderImage;
 	std::unordered_map<std::string, PipelineLayout*> pipelineLayouts;
 	std::unordered_map<std::string, Pipeline*> pipelines;
 	sf::Music backgroundMusic;
@@ -136,7 +138,7 @@ public:
 		Device::enabledFeatures12.descriptorBindingVariableDescriptorCount = VK_TRUE;
 		Device::enabledFeatures13.dynamicRendering = VK_TRUE;
 
-		settings.sampleCount = VK_SAMPLE_COUNT_4_BIT;
+		//settings.sampleCount = VK_SAMPLE_COUNT_4_BIT;
 
 		audioManager = new AudioManager();
 
@@ -596,6 +598,7 @@ public:
 				{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 8 /*getFrameCount()*/ },
 				{.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = 4096 /*@todo*/},
 				{.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 256 /*@todo*/},
+				{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 4 /*@todo*/},
 			}
 		});
 
@@ -750,6 +753,87 @@ public:
 		});
 		pipelineList.push_back(pipelines["tilemap"]);
 
+		// Post process
+		descriptorSetLayoutRenderImage = new DescriptorSetLayout({
+			.descriptorIndexing = true,
+			.bindings = {
+				{.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT}
+			}
+		});
+
+		SamplerCreateInfo samplerCI{
+			.name = "Post process sampler",
+			.magFilter = VK_FILTER_LINEAR,
+			.minFilter = VK_FILTER_LINEAR,
+			.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+			.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+			.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+		};
+		renderImageSampler = new Sampler(samplerCI);
+
+		VkDescriptorImageInfo renderImageDesc{
+			.sampler = renderImageSampler->handle,
+			.imageView = renderImage.view,
+			.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		};
+
+		descriptorSetRenderImage = new DescriptorSet({
+			.pool = descriptorPool,
+			.layouts = { descriptorSetLayoutRenderImage->handle },
+			.descriptors = {
+				{.dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &renderImageDesc}
+			}
+		});
+
+		pipelineLayouts["postprocess"] = new PipelineLayout({
+			.layouts = { descriptorSetLayoutUniforms->handle, descriptorSetLayoutRenderImage->handle,  },
+		});
+
+		pipelines["postprocess"] = new Pipeline({
+			.shaders = {
+				.filename = getAssetPath() + "shaders/postprocess.slang",
+				.stages = { VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT }
+			},
+			.cache = pipelineCache,
+			.layout = *pipelineLayouts["postprocess"],
+			//.vertexInput = vertexInput,
+			.inputAssemblyState = {
+				.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+			},
+			.viewportState = {
+				.viewportCount = 1,
+				.scissorCount = 1
+			},
+			.rasterizationState = {
+				.polygonMode = VK_POLYGON_MODE_FILL,
+				.cullMode = VK_CULL_MODE_BACK_BIT,
+				.frontFace = VK_FRONT_FACE_CLOCKWISE,
+				.lineWidth = 1.0f
+			},
+			.multisampleState = {
+				.rasterizationSamples = settings.sampleCount,
+			},
+			.depthStencilState = {
+				.depthTestEnable = VK_FALSE,
+				.depthWriteEnable = VK_FALSE,
+				.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+			},
+			.blending = {
+				.attachments = { blendAttachmentState }
+			},
+			.dynamicState = {
+				DynamicState::Scissor,
+				DynamicState::Viewport
+			},
+			.pipelineRenderingInfo = {
+				.colorAttachmentCount = 1,
+				.pColorAttachmentFormats = &swapChain->colorFormat,
+				.depthAttachmentFormat = depthFormat,
+				.stencilAttachmentFormat = depthFormat
+			},
+			.enableHotReload = true
+		});
+		pipelineList.push_back(pipelines["postprocess"]);
 		for (auto& pipeline : pipelineList) {
 			fileWatcher->addPipeline(pipeline);
 		}
@@ -793,6 +877,15 @@ public:
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
 			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
 		cb->insertImageMemoryBarrier(
+			renderImage.image,
+			0,
+			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
+		cb->insertImageMemoryBarrier(
 			depthStencil.image,
 			0,
 			VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
@@ -805,10 +898,10 @@ public:
 		// New structures are used to define the attachments used in dynamic rendering
 		colorAttachment = {};
 		colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-		colorAttachment.imageView = multiSampling ? multisampleTarget.color.view : swapChain->buffers[swapChain->currentImageIndex].view;
+		colorAttachment.imageView = multiSampling ? multisampleTarget.color.view : renderImage.view;
 		colorAttachment.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR;
 		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		colorAttachment.clearValue.color = { 0.0f, 0.0f, 0.0f, 0.0f };
 		if (multiSampling) {
 			colorAttachment.resolveImageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
@@ -874,7 +967,27 @@ public:
 		cb->bindVertexBuffers(1, 1, { frame.instanceBuffer->buffer });
 		cb->bindDescriptorSets(pipelineLayouts["sprite"], { descriptorSetTextures, descriptorSetSamplers, frame.descriptorSet });
 		cb->bindPipeline(pipelines["sprite"]);
-		cb->draw(6, frame.instanceBufferDrawCount, 0, 0);
+		cb->draw(6, frame.instanceBufferDrawCount, 0, 0);		
+		cb->endRendering();
+
+		// Transition color image for presentation
+		cb->insertImageMemoryBarrier(
+			renderImage.image,
+			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
+
+		// Post process
+		colorAttachment.imageView = swapChain->buffers[swapChain->currentImageIndex].view;
+		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		cb->beginRendering(renderingInfo);
+		cb->bindDescriptorSets(pipelineLayouts["postprocess"], { frame.descriptorSet, descriptorSetRenderImage });
+		cb->bindPipeline(pipelines["postprocess"]);
+		cb->draw(3, 1, 0, 0);
 		if (overlay->visible) {
 			overlay->draw(cb, getCurrentFrameIndex());
 		}
@@ -934,6 +1047,16 @@ public:
 				pipeline->reload();
 			}
 		}
+	}
+
+	void windowResized() override
+	{
+		VkDescriptorImageInfo renderImageDesc{
+			.sampler = renderImageSampler->handle,
+			.imageView = renderImage.view,
+			.imageLayout = VK_IMAGE_LAYOUT_GENERAL,
+		};
+		descriptorSetRenderImage->updateDescriptor(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, &renderImageDesc, 1);
 	}
 
 	void OnUpdateOverlay(vks::UIOverlay& overlay) {

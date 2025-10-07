@@ -31,7 +31,6 @@ public:
 	VkDescriptorSet handle;
 
 	DescriptorSet(DescriptorSetCreateInfo createInfo) {
-		descriptors = createInfo.descriptors;
 		for (auto& descriptor : descriptors) {
 			descriptor.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 		}
@@ -50,6 +49,7 @@ public:
 			descriptor.dstSet = handle;
 		}
 		vkUpdateDescriptorSets(VulkanContext::device->logicalDevice, static_cast<uint32_t>(createInfo.descriptors.size()), createInfo.descriptors.data(), 0, nullptr);
+		descriptors = createInfo.descriptors;
 	}
 
 	~DescriptorSet() {
@@ -91,6 +91,7 @@ public:
 				descriptor.descriptorType = type;
 				descriptor.pImageInfo = imageInfo;
 				descriptor.descriptorCount = descriptorCount;
+				descriptor.dstSet = descriptor.dstSet;
 				vkUpdateDescriptorSets(VulkanContext::device->logicalDevice, 1, &descriptor, 0, nullptr);
 				break;
 			}

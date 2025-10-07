@@ -94,6 +94,7 @@ protected:
 		ImageAttachment color;
 		ImageAttachment depth;
 	} multisampleTarget;
+	ImageAttachment renderImage;
 	ImageAttachment depthStencil;
 	uint32_t frameCounter = 0;
 	uint32_t lastFPS = 0;

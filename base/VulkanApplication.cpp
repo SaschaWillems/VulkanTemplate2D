@@ -201,7 +201,7 @@ void VulkanApplication::prepare()
 		.assetPath = getAssetPath(),
 		.scale = 1.0f,
 		.frameCount = getFrameCount(),
-		});
+	});
 }
 
 void VulkanApplication::renderFrame()
@@ -1668,7 +1668,47 @@ void VulkanApplication::setupDepthStencil()
 
 void VulkanApplication::setupImages()
 {
-	if (settings.sampleCount > VK_SAMPLE_COUNT_1_BIT) {
+	if (settings.sampleCount && VK_SAMPLE_COUNT_1_BIT) {
+		if (renderImage.image != VK_NULL_HANDLE) {
+			vkDestroyImage(*vulkanDevice, renderImage.image, nullptr);
+			vkDestroyImageView(*vulkanDevice, renderImage.view, nullptr);
+			vkFreeMemory(*vulkanDevice, renderImage.memory, nullptr);
+		}
+		VkImageCreateInfo imageCI{
+			.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+			.imageType = VK_IMAGE_TYPE_2D,
+			.format = swapChain->colorFormat,
+			.extent = { .width = width, .height = height, .depth = 1 },
+			.mipLevels = 1,
+			.arrayLayers = 1,
+			.samples = VK_SAMPLE_COUNT_1_BIT,
+			.tiling = VK_IMAGE_TILING_OPTIMAL,
+			.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+			.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
+		};
+		VK_CHECK_RESULT(vkCreateImage(*vulkanDevice, &imageCI, nullptr, &renderImage.image));
+
+		VkMemoryRequirements memReqs;
+		vkGetImageMemoryRequirements(*vulkanDevice, renderImage.image, &memReqs);
+		VkMemoryAllocateInfo memAllocInfo{
+			.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+			.allocationSize = memReqs.size,
+			.memoryTypeIndex = vulkanDevice->getMemoryType(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+		};
+		VK_CHECK_RESULT(vkAllocateMemory(*vulkanDevice, &memAllocInfo, nullptr, &renderImage.memory));
+		vkBindImageMemory(*vulkanDevice, renderImage.image, renderImage.memory, 0);
+
+		VkImageViewCreateInfo imageViewCI{
+			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.image = renderImage.image,
+			.viewType = VK_IMAGE_VIEW_TYPE_2D,
+			.format = swapChain->colorFormat,
+			.components = {.r = VK_COMPONENT_SWIZZLE_R, .g = VK_COMPONENT_SWIZZLE_G, .b = VK_COMPONENT_SWIZZLE_B, .a = VK_COMPONENT_SWIZZLE_A },
+			.subresourceRange = {.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT, .levelCount = 1, .layerCount = 1 }
+		};
+		VK_CHECK_RESULT(vkCreateImageView(*vulkanDevice, &imageViewCI, nullptr, &renderImage.view));
+	} else {
 		// Check if device supports requested sample count for color and depth frame buffer
 		//assert((deviceProperties.limits.framebufferColorSampleCounts >= sampleCount) && (deviceProperties.limits.framebufferDepthSampleCounts >= sampleCount));
 
