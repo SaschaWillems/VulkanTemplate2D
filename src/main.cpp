@@ -107,6 +107,7 @@ private:
 	std::vector<vks::Texture2D*> textures{};
 	TileMap tileMap;
 	Sampler* spriteSampler{ nullptr };
+	Sampler* renderImageSampler{ nullptr };
 	
 	std::vector<FrameObjects> frameObjects;
 	FileWatcher* fileWatcher{ nullptr };
@@ -133,6 +134,7 @@ public:
 		Device::enabledFeatures.fillModeNonSolid = VK_TRUE;
 
 		Device::enabledFeatures11.multiview = VK_TRUE;
+		Device::enabledFeatures11.shaderDrawParameters = VK_TRUE;
 		Device::enabledFeatures12.descriptorIndexing = VK_TRUE;
 		Device::enabledFeatures12.runtimeDescriptorArray = VK_TRUE;
 		Device::enabledFeatures12.descriptorBindingVariableDescriptorCount = VK_TRUE;
@@ -305,18 +307,17 @@ public:
 			tileCounter++;
 		}
 
-		//for (auto i = 0; i < tileMap.width; i++) {
-		//	texBuffer[i] = 2;
-		//}
 		vks::TextureFromBufferCreateInfo texCI = {
 			.buffer = texBuffer,
 			.bufferSize = texBufferSize,
 			.texWidth = tileMap.width,
 			.texHeight = tileMap.height,
 			.format = VK_FORMAT_R32_UINT,
+			.imageUsageFlags = VK_IMAGE_USAGE_STORAGE_BIT,
 			.createSampler = false,
+			.magFilter = VK_FILTER_NEAREST,
+			.minFilter = VK_FILTER_NEAREST,
 		};
-		// @todo: Throws validation errors
 		tileMap.texture = new vks::Texture2D(texCI);
 		textures.push_back(tileMap.texture);
 		tileMap.imageIndex = static_cast<uint32_t>(textures.size() - 1);
@@ -511,7 +512,7 @@ public:
 				const char v = number.stringValue[i];
 				instance.imageIndex = game.firstNumberImageIndex + std::atoi(&v);
 				// @todo: center
-				instance.pos = glm::vec3(number.position + glm::vec2(i * number.scale * 0.75f, 0.0f), 0.0f);
+				instance.pos = glm::vec3(number.position + glm::vec2(i * number.scale * 0.6f, 0.0f), 0.0f);
 				instance.scale = number.scale;
 				instance.effect = static_cast<uint32_t>(number.effect);
 			}
@@ -985,6 +986,7 @@ public:
 		colorAttachment.imageView = swapChain->buffers[swapChain->currentImageIndex].view;
 		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		cb->beginRendering(renderingInfo);
+		cb->setViewport(0.0f, 0.0f, width, height, 0.0f, 1.0f);
 		cb->bindDescriptorSets(pipelineLayouts["postprocess"], { frame.descriptorSet, descriptorSetRenderImage });
 		cb->bindPipeline(pipelines["postprocess"]);
 		cb->draw(3, 1, 0, 0);
