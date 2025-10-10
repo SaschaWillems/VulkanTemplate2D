@@ -9,6 +9,8 @@ struct UBO
     float4x4 mvp;
     float time;
     float timer;
+    float _notused0;
+    float postProcessTimer;
 };
 
 cbuffer ubo { UBO ubo; }
@@ -28,6 +30,11 @@ float3 desaturate(float3 color, float factor)
     return lerp(color, gray, factor);
 }
 
+float3 fade(float3 color, float factor)
+{
+    return color * factor;
+}
+
 [shader("vertex")]
 VSOutput main(uint VertexIndex : SV_VertexID)
 {
@@ -38,9 +45,12 @@ VSOutput main(uint VertexIndex : SV_VertexID)
 }
 
 [shader("fragment")]
-float4 main(VSOutput input)
+float4 main(VSOutput input, uniform int effect)
 {
     float3 inputColor = inputImage.Sample(input.UV).rgb;
     inputColor = desaturate(inputColor, 0.3);
+    if (effect == 1) {
+        inputColor = fade(inputColor, ubo.postProcessTimer);
+    }
     return float4(inputColor, 1.0);
 }

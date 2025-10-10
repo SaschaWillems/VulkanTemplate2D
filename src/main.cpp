@@ -47,6 +47,7 @@ struct ShaderData {
 	float time{ 0.0f };
 	float timer{ 0.0f };
 	float tileMapSpeed;
+	float postProcessTimer{ 0.0f };
 } shaderData;
 
 float tileMapSpeed{ 2.08f };
@@ -72,6 +73,11 @@ struct TileMap {
 	uint32_t lastTileIndex;
 	uint32_t width = 4096;
 	uint32_t height = 4096;
+};
+
+enum class PostProcessEffect {
+	None = 0,
+	FadeIn = 1
 };
 
 Game::Game game;
@@ -124,6 +130,8 @@ private:
 	sf::Music backgroundMusic;
 	Buffer* quadBuffer{ nullptr };
 	glm::vec2 screenDim{ 0.0f };
+	PostProcessEffect postProcessEffect{ PostProcessEffect::None };
+	float postProcessTimeFactor{ 1.0f };
 public:	
 	Application() : VulkanApplication() {
 		apiVersion = VK_API_VERSION_1_3;
@@ -152,9 +160,8 @@ public:
 		//shaderData.projection = glm::ortho(-screenDim.x, screenDim.x, -screenDim.x, screenDim.x);
 
 		title = "Bindless Survivors";
-
-		paused = true;
 	}
+		
 
 	~Application() {		
 		vkDeviceWaitIdle(VulkanContext::device->logicalDevice);
@@ -195,6 +202,25 @@ public:
 		delete slangCompiler;
 	}
 
+	void setPostProcessEffect(PostProcessEffect effect) {
+		postProcessEffect = effect;
+		switch (effect) {
+		case PostProcessEffect::FadeIn:
+			shaderData.postProcessTimer = 0.0f;
+			postProcessTimeFactor = 0.25f;
+		}
+	}
+
+	void updatePostProcessEffect(float delta)
+	{
+		shaderData.postProcessTimer += delta * postProcessTimeFactor;
+		switch (postProcessEffect) {
+		case PostProcessEffect::FadeIn:
+			if (shaderData.postProcessTimer >= 1.0f) {
+				setPostProcessEffect(PostProcessEffect::None);
+			}
+		}
+	}
 	void loadTexture(const std::string filename, uint32_t& index)
 	{
 		int width, height, channels;
@@ -788,6 +814,10 @@ public:
 
 		pipelineLayouts["postprocess"] = new PipelineLayout({
 			.layouts = { descriptorSetLayoutUniforms->handle, descriptorSetLayoutRenderImage->handle,  },
+			// Used to select the current post process effect
+			.pushConstantRanges = {
+				{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = sizeof(int32_t)}
+			}
 		});
 
 		pipelines["postprocess"] = new Pipeline({
@@ -851,6 +881,9 @@ public:
 		} else {
 			std::cout << "Could not load background music track\n";
 		}
+
+		setPostProcessEffect(PostProcessEffect::FadeIn);
+
 		prepared = true;
 	}
 
@@ -989,6 +1022,7 @@ public:
 		cb->setViewport(0.0f, 0.0f, width, height, 0.0f, 1.0f);
 		cb->bindDescriptorSets(pipelineLayouts["postprocess"], { frame.descriptorSet, descriptorSetRenderImage });
 		cb->bindPipeline(pipelines["postprocess"]);
+		cb->updatePushConstant(pipelineLayouts["postprocess"], 0, &postProcessEffect);
 		cb->draw(3, 1, 0, 0);
 		if (overlay->visible) {
 			overlay->draw(cb, getCurrentFrameIndex());
@@ -1034,6 +1068,7 @@ public:
 			updateInstanceBuffer(currentFrame);
 		}
 
+		updatePostProcessEffect(frameTimer);
 		shaderData.timer = timer;
 		//shaderData.view = glm::mat4(1.0f);
 		shaderData.mvp = glm::translate(glm::mat4(1.0f), -glm::vec3(game.player.position / screenDim, 0.0f));
