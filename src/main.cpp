@@ -1109,6 +1109,9 @@ public:
 		ImGui::Begin("Player");
 		ImGui::Text("XP: %.2f", game.player.experience);
 		ImGui::Text("Level: %d", game.player.level);
+		ImGui::Text("Crit chance: %.1f", game.player.criticalChance);
+		ImGui::Text("Crit dmg: %.1f", game.player.criticalDamageMultiplier);
+		ImGui::Text("Stamina: %.1f / %.1f", game.player.stamina, game.player.maxStamina);
 		ImGui::End();
 
 		ImGui::SetNextWindowPos(ImVec2(30, 30), ImGuiSetCond_FirstUseEver);

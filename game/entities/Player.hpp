@@ -1,5 +1,5 @@
 /*
-* Copyright(C) 2024 by Sascha Willems - www.saschawillems.de
+* Copyright(C) 2024-2025 by Sascha Willems - www.saschawillems.de
 *
 * This code is licensed under the MIT license(MIT) (http://opensource.org/licenses/MIT)
 */
@@ -16,6 +16,8 @@ namespace Game {
 			uint32_t level;
 			float criticalChance{ 5.0f };
 			float criticalDamageMultiplier{ 1.5f };
+			float stamina{ 2.5f };
+			float maxStamina{ 2.5f };
 			void addExperience(float value);
 		};
 	}

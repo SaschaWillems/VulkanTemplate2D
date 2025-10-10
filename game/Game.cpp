@@ -330,7 +330,20 @@ void Game::Game::updateInput(float delta)
 {
 	float playerSpeed = player.speed;
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::LShift)) {
-		playerSpeed *= 2.0f;
+		if (player.stamina > 0.0f) {
+			playerSpeed *= 2.0f;
+		}
+		player.stamina -= delta * 2.5f;
+		if (player.stamina < 0.0f) {
+			player.stamina = 0.0f;
+		}
+	} else {
+		if (player.stamina < player.maxStamina) {
+			player.stamina += delta * 1.5f;
+			if (player.stamina > player.maxStamina) {
+				player.stamina = player.maxStamina;
+			};
+		}
 	}
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
 		player.position.x -= playerSpeed * delta;
