@@ -60,6 +60,8 @@ namespace Game {
 		float playerFireTimer{ 0.0f };
 		float playerFireTimerDuration{ 5.0f };
 
+		Run currentRun;
+
 		Game();
 		void spawnMonsters(uint32_t count);
 		void spawnProjectile(Entities::Source source, uint32_t imageIndex, glm::vec2 position, glm::vec2 direction);

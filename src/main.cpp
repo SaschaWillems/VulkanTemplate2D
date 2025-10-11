@@ -1122,6 +1122,12 @@ public:
 		ImGui::Text("Pickups: %d", static_cast<uint32_t>(game.pickups.size()));
 		ImGui::Text("Numbers: %d", static_cast<uint32_t>(game.numbers.size()));
 		ImGui::End();
+		ImGui::SetNextWindowPos(ImVec2(50, 50), ImGuiSetCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(0, 50), ImGuiSetCond_FirstUseEver);
+		ImGui::Begin("Current run", 0, ImGuiWindowFlags_None);
+		ImGui::Text("Duration: %0.2d:%0.2d", static_cast<int32_t>(floor(game.currentRun.duration)) / 60, static_cast<int32_t>(floor(game.currentRun.duration)) % 60);
+		ImGui::Text("Monsters killed: %d", game.currentRun.monstersKilled);
+		ImGui::End();
 	}
 
 	void onFileChanged(const std::string filename, const std::vector<void*> owners) {

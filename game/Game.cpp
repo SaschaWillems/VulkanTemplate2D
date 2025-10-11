@@ -161,6 +161,7 @@ void Game::Game::monsterProjectileCollisionCheck(Entities::Monster& monster)
 					}
 					spawnPickup(xpPickup);
 					audioManager->playSnd("enemydeath");
+					currentRun.monstersKilled++;
 				}
 				else {
 					audioManager->playSnd("enemyhit");
@@ -177,6 +178,9 @@ void Game::Game::update(float delta)
 {
 	// @todo: totally work in progress
 	// @todo: use multi threading
+
+
+	currentRun.update(delta);
 
 	// Player projectiles
 	playerFireTimer += delta * 25.0f;
