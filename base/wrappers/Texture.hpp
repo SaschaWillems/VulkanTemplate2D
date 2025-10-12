@@ -337,7 +337,8 @@ namespace vks
 			imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 			imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 			imageCreateInfo.extent = { width, height, 1 };
-			imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+			imageCreateInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+			imageCreateInfo.usage |= createInfo.imageUsageFlags;
 			VK_CHECK_RESULT(vkCreateImage(VulkanContext::device->logicalDevice, &imageCreateInfo, nullptr, &image));
 
 			vkGetImageMemoryRequirements(VulkanContext::device->logicalDevice, image, &memReqs);
@@ -430,7 +431,7 @@ namespace vks
 					vkCmdPipelineBarrier(blitCmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
 				}
 
-				vkCmdBlitImage(blitCmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageBlit, VK_FILTER_LINEAR);
+				vkCmdBlitImage(blitCmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageBlit, createInfo.minFilter);
 
 				{
 					VkImageMemoryBarrier imageMemoryBarrier{};

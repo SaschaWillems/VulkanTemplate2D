@@ -339,7 +339,7 @@ public:
 			.texWidth = tileMap.width,
 			.texHeight = tileMap.height,
 			.format = VK_FORMAT_R32_UINT,
-			.imageUsageFlags = VK_IMAGE_USAGE_STORAGE_BIT,
+			.imageUsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 			.createSampler = false,
 			.magFilter = VK_FILTER_NEAREST,
 			.minFilter = VK_FILTER_NEAREST,
