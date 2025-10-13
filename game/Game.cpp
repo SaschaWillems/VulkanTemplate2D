@@ -262,6 +262,12 @@ void Game::Game::update(float delta)
 							pickup.state = Entities::State::Dead;
 							player.addExperience(pickup.value);
 							audioManager->playSnd("pickupxp");
+							// @todo: move to somewhere else
+							if (player.experience >= getNextLevelExp(player.level + 1)) {
+								player.level++;
+								// @todo: rethink
+								setState(GameState::LevelUp);
+							}
 						}
 					}
 				}
@@ -361,4 +367,12 @@ void Game::Game::updateInput(float delta)
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
 		player.position.y += playerSpeed * delta;
 	}
+}
+
+int32_t Game::Game::getNextLevelExp(int32_t level)
+{
+	// @todo: need to adjust this
+	float exponent = 1.25f;
+	float base = 500;
+	return floor(base * (pow(level, exponent)));
 }

@@ -13,6 +13,7 @@
 #include <tracy/Tracy.hpp>
 #include <Threadpool.hpp>
 
+#include "Run.hpp"
 #include "object_types/Monsters.hpp"
 #include "entities/Entity.hpp"
 #include "entities/Monster.hpp"
@@ -71,5 +72,6 @@ namespace Game {
 		void monsterProjectileCollisionCheck(Entities::Monster& monster);
 		void update(float delta);
 		void updateInput(float delta);
+		int32_t getNextLevelExp(int32_t level);
 	};
 }
