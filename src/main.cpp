@@ -287,6 +287,7 @@ public:
 			.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		};
 		tileMap.sampler = new Sampler(samplerCI);
+		tilemap.sampler = new Sampler(samplerCI);
 
 		// @todo
 		// Audio
@@ -348,17 +349,17 @@ public:
 		vks::TextureFromBufferCreateInfo texCI = {
 			.buffer = texBuffer,
 			.bufferSize = texBufferSize,
-			.texWidth = tileMap.width,
-			.texHeight = tileMap.height,
+			.texWidth = tilemap.width,
+			.texHeight = tilemap.height,
 			.format = VK_FORMAT_R32_UINT,
 			.imageUsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 			.createSampler = false,
 			.magFilter = VK_FILTER_NEAREST,
-			.minFilter = VK_FILTER_NEAREST,
+			.minFilter = VK_FILTER_NEAREST
 		};
-		tileMap.texture = new vks::Texture2D(texCI);
-		textures.push_back(tileMap.texture);
-		tileMap.imageIndex = static_cast<uint32_t>(textures.size() - 1);
+		tilemap.texture = new vks::Texture2D(texCI);
+		textures.push_back(tilemap.texture);
+		tilemap.imageIndex = static_cast<uint32_t>(textures.size() - 1);
 	}
 
 	void updateTextureDescriptor() {
@@ -409,12 +410,12 @@ public:
 			}
 		});
 
-		tileMap.descriptorSetSampler = new DescriptorSet({
+		tilemap.descriptorSetSampler = new DescriptorSet({
 			.pool = descriptorPool,
 			.variableDescriptorCount = samplerCount,
 			.layouts = { descriptorSetLayoutSamplers->handle },
 			.descriptors = {
-				{.dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .pImageInfo = &tileMap.sampler->descriptor},
+				{.dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .pImageInfo = &tilemap.sampler->descriptor},
 			}
 		});
 	}
