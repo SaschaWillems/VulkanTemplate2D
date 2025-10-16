@@ -12,6 +12,7 @@
 #include "Initializers.hpp"
 #include "VulkanTools.h"
 #include "Device.hpp"
+#include "DeviceResource.h"
 #include "VulkanContext.h"
 
 struct SamplerCreateInfo {

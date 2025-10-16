@@ -16,6 +16,7 @@
 #include <SFML/Audio.hpp>
 #include <json.hpp>
 #include "Game.hpp"
+#include "Tilemap.hpp"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -46,11 +47,11 @@ struct ShaderData {
 	glm::mat4 mvp;
 	float time{ 0.0f };
 	float timer{ 0.0f };
-	float tileMapSpeed;
+	float _unused;
 	float postProcessTimer{ 0.0f };
+	glm::vec2 playerPos{ 0.0f };
+	glm::vec2 screenDim{ 0.0f };
 } shaderData;
-
-float tileMapSpeed{ 2.08f };
 
 struct Vertex {
 	float pos[3];
@@ -62,17 +63,6 @@ struct InstanceData {
 	float scale{ 1.0f };
 	uint32_t imageIndex{ 0 };
 	uint32_t effect{ 0 };
-};
-
-struct TileMap {
-	vks::Texture2D* texture{ nullptr };
-	Sampler* sampler{ nullptr };
-	DescriptorSet* descriptorSetSampler{ nullptr };
-	uint32_t imageIndex;
-	uint32_t firstTileIndex;
-	uint32_t lastTileIndex;
-	uint32_t width = 4096;
-	uint32_t height = 4096;
 };
 
 enum class PostProcessEffect {
@@ -111,7 +101,7 @@ private:
 	std::vector<VkDescriptorImageInfo> textureDescriptors{};
 	std::vector<VkDescriptorImageInfo> samplerDescriptors{};
 	std::vector<vks::Texture2D*> textures{};
-	TileMap tileMap;
+	Game::Tilemap tilemap;
 	Sampler* spriteSampler{ nullptr };
 	Sampler* renderImageSampler{ nullptr };
 	
@@ -221,6 +211,7 @@ public:
 			}
 		}
 	}
+
 	void loadTexture(const std::string filename, uint32_t& index)
 	{
 		int width, height, channels;
@@ -314,23 +305,44 @@ public:
 	// @todo
 	// Tile map for the background is stored as a single one integer channel format, with each pixel storing a zero-based tile index
 	void createTileMap () {
-		const size_t texBufferSize = tileMap.width * tileMap.height * 4;
+		tilemap.setSize(4096, 4096);
+		const size_t texBufferSize = tilemap.width * tilemap.height * 4;
 		uint32_t* texBuffer = new uint32_t[texBufferSize];
 		memset(texBuffer, 0, texBufferSize);
 		
 		// @todo: random tiles for testing
-		std::uniform_int_distribution<uint32_t> rndTile(0, static_cast<uint32_t>(0, tileMap.lastTileIndex - tileMap.firstTileIndex));
+		std::uniform_int_distribution<uint32_t> rndTile(0, static_cast<uint32_t>(0, tilemap.lastTileIndex - tilemap.firstTileIndex));
+		std::uniform_real_distribution<float> rndFDist(0.0f, 100.0f);
 		// @todo: generate border to see how tile map size works
 		uint32_t tileCounter{ 0 };
-		uint32_t tileType = 0;
-		for (size_t i = 0; i < tileMap.width * tileMap.height; i++) {
-			if (tileCounter >= tileMap.width * 8) {
-				tileType = rndTile(game.randomEngine);
+		uint32_t tileType{ 0 }, nextTielType{ 0 };
+		uint32_t x{ 0 }, y{ 0 };
+		for (size_t i = 0; i < tilemap.width * tilemap.height; i++) {
+			tileType = 0;
+			if (tileCounter >= tilemap.width * 8) {
+//				tileType = rndTile(game.randomEngine);
 				tileCounter = 0;
 			}
 			//tileType = rndTile(game.randomEngine);
+			//if ((x == tileMap.width / 2) || (y  == tileMap.height / 2)) {
+			if (x == 0 || x == tilemap.width - 1 || y == 0 || y == tilemap.height - 1)
+			{
+				tileType = 3;
+			}
+			else if ((x % 64 == 0) || (y % 64 == 0)) {
+				tileType = 2;
+			}
+			// @todo: randomly fill areas between cross roads
+			//if (tileType == 0) {
+			//	tileType = rndTile(game.randomEngine);
+			//}
 			texBuffer[i] = tileType;
 			tileCounter++;
+			x++;
+			if (x >= tilemap.width) {
+				x = 0;
+				y++;
+			}
 		}
 
 		vks::TextureFromBufferCreateInfo texCI = {
@@ -593,8 +605,10 @@ public:
 
 		game.player.speed = 5.0f;
 		game.player.scale = 1.0f;
-		game.player.position = glm::vec2(-(float)tileMap.width / 2.0f, -(float)tileMap.height / 2.0f);
-
+		game.player.position = glm::vec2(-(float)tilemap.width / 2.0f, -(float)tilemap.height / 2.0f);
+		// @todo
+		//game.player.position = glm::vec2((float)tileMap.width - 64.0f, (float)tileMap.height - 64.0f);
+		game.player.position = glm::vec2(0.0f);
 
 		// @todo: for benchmarking, this is > 60 fps on my setup
 		//spawnMonsters(1150000);
@@ -865,6 +879,7 @@ public:
 			.enableHotReload = true
 		});
 		pipelineList.push_back(pipelines["postprocess"]);
+
 		for (auto& pipeline : pipelineList) {
 			fileWatcher->addPipeline(pipeline);
 		}
@@ -981,15 +996,15 @@ public:
 			uint32_t uints[2];
 			float floats[2];
 		} pushConsts;
-		pushConsts.uints[0] = tileMap.imageIndex;
-		pushConsts.uints[1] = tileMap.firstTileIndex;
+		pushConsts.uints[0] = tilemap.imageIndex;
+		pushConsts.uints[1] = tilemap.firstTileIndex;
 		pushConsts.floats[0] = (float)width / 32.0f;
 		pushConsts.floats[1] = (float)height / 32.0f;
 
 		pushConsts.floats[0] = 1024.0f / 32.0f;
 		pushConsts.floats[1] = 1024.0f / 32.0f;
 
-		cb->bindDescriptorSets(pipelineLayouts["tilemap"], { descriptorSetTextures, tileMap.descriptorSetSampler, frame.descriptorSet });
+		cb->bindDescriptorSets(pipelineLayouts["tilemap"], { descriptorSetTextures, tilemap.descriptorSetSampler, frame.descriptorSet });
 		cb->bindPipeline(pipelines["tilemap"]);
 		cb->updatePushConstant(pipelineLayouts["tilemap"], 0, &pushConsts);
 		cb->draw(3, 1, 0, 0);
@@ -1069,11 +1084,13 @@ public:
 		}
 
 		updatePostProcessEffect(frameTimer);
+
 		shaderData.timer = timer;
 		//shaderData.view = glm::mat4(1.0f);
 		shaderData.mvp = glm::translate(glm::mat4(1.0f), -glm::vec3(game.player.position / screenDim, 0.0f));
 		shaderData.mvp *= glm::ortho(-screenDim.x, screenDim.x, -screenDim.x, screenDim.x);
-		shaderData.tileMapSpeed = tileMapSpeed;
+		shaderData.playerPos = game.player.position;
+		shaderData.screenDim = screenDim;
 		memcpy(currentFrame.uniformBuffer->mapped, &shaderData, sizeof(ShaderData)); // @todo: buffer function
 
 		recordCommandBuffer(currentFrame);
@@ -1107,6 +1124,7 @@ public:
 		ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiSetCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ImVec2(0, 50), ImGuiSetCond_FirstUseEver);
 		ImGui::Begin("Player");
+		ImGui::Text("Pos: %.2f / %.2f", game.player.position.x, game.player.position.y);
 		ImGui::Text("XP: %.2f / %d", game.player.experience, game.getNextLevelExp(game.player.level + 1));
 		ImGui::Text("Level: %d", game.player.level);
 		ImGui::Text("Crit chance: %.1f", game.player.criticalChance);
