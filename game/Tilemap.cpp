@@ -22,3 +22,7 @@ void Game::Tilemap::setSize(uint32_t width, uint32_t height)
 	this->width = width;
 	this->height = height;
 }
+
+glm::ivec2 Game::Tilemap::tilePosFromVisualPos(glm::vec2 visualPos) const {
+	return glm::ivec2{ (int)(floor(visualPos.x * screenFactor.x )), (int)(floor(visualPos.y * screenFactor.y )) };
+}

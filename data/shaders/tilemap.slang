@@ -23,6 +23,7 @@ struct UBO
     float _unused0;
     float2 playerPos;
     float2 screenDim;
+    float2 tilemapDim;
 };
 [[vk::binding(0, 2)]]
 ConstantBuffer<UBO> ubo : register(b0, space2);
@@ -53,6 +54,9 @@ float4 main(VSOutput input) : SV_TARGET
     float2 uv = input.uv * _div;
     // Center at player
     uv += 0.5;
+    if (uv.x < 0.0 || uv.y < 0.0 || uv.x > ubo.tilemapDim.x || uv.y > ubo.tilemapDim.y) {
+        return float4(0.0, 0.0, 0.0, 1.0);
+    }
     uint texIdx = texturesInt[pushConsts.tileMapIndex].Load(int3(uv, 0)) + pushConsts.tileSetStartIndex;
     float2 locuv = uv;
     locuv.x = fmod(uv.x, 1.0);

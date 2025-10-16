@@ -16,7 +16,6 @@
 #include <SFML/Audio.hpp>
 #include <json.hpp>
 #include "Game.hpp"
-#include "Tilemap.hpp"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -51,6 +50,7 @@ struct ShaderData {
 	float postProcessTimer{ 0.0f };
 	glm::vec2 playerPos{ 0.0f };
 	glm::vec2 screenDim{ 0.0f };
+	glm::vec2 tilemapDim{ 0.0f };
 } shaderData;
 
 struct Vertex {
@@ -122,6 +122,7 @@ private:
 	glm::vec2 screenDim{ 0.0f };
 	PostProcessEffect postProcessEffect{ PostProcessEffect::None };
 	float postProcessTimeFactor{ 1.0f };
+	uint32_t visibleTileCount{ 32 };
 public:	
 	Application() : VulkanApplication() {
 		apiVersion = VK_API_VERSION_1_3;
@@ -265,9 +266,10 @@ public:
 
 		// @todo: tile map
 		uint32_t dummyIdx;
-		loadTexture(getAssetPath() + "game/tiles/set0/grass_0_new.png", tileMap.firstTileIndex);
-		loadTexture(getAssetPath() + "game/tiles/set0/grass0-dirt-mix_1.png", tileMap.lastTileIndex);
-		loadTexture(getAssetPath() + "game/tiles/set0/grass_full_old.png", tileMap.lastTileIndex);
+		loadTexture(getAssetPath() + "game/tiles/set0/grass_0_new.png", game.tilemap.firstTileIndex);
+		loadTexture(getAssetPath() + "game/tiles/set0/grass0-dirt-mix_1.png", game.tilemap.lastTileIndex);
+		loadTexture(getAssetPath() + "game/tiles/set0/grass_full_old.png", game.tilemap.lastTileIndex);
+		loadTexture(getAssetPath() + "game/tiles/set0/shallow_water.png", game.tilemap.lastTileIndex);
 
 		SamplerCreateInfo samplerCI {
 			.name = "Sprite sampler",
@@ -286,8 +288,7 @@ public:
 			.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 			.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
 		};
-		tileMap.sampler = new Sampler(samplerCI);
-		tilemap.sampler = new Sampler(samplerCI);
+		game.tilemap.sampler = new Sampler(samplerCI);
 
 		// @todo
 		// Audio
@@ -306,27 +307,29 @@ public:
 	// @todo
 	// Tile map for the background is stored as a single one integer channel format, with each pixel storing a zero-based tile index
 	void createTileMap () {
-		tilemap.setSize(4096, 4096);
-		const size_t texBufferSize = tilemap.width * tilemap.height * 4;
+		game.tilemap.setSize(4096, 4096);
+		game.tilemap.screenFactor = { 1.0f / (screenDim.x * 2.0f / (float)visibleTileCount), 1.0f / (screenDim.y * 2.0f / (float)visibleTileCount) };
+		shaderData.tilemapDim = { (float)game.tilemap.width, (float)game.tilemap.height };
+		const size_t texBufferSize = game.tilemap.width * game.tilemap.height * 4;
 		uint32_t* texBuffer = new uint32_t[texBufferSize];
 		memset(texBuffer, 0, texBufferSize);
 		
 		// @todo: random tiles for testing
-		std::uniform_int_distribution<uint32_t> rndTile(0, static_cast<uint32_t>(0, tilemap.lastTileIndex - tilemap.firstTileIndex));
+		std::uniform_int_distribution<uint32_t> rndTile(0, static_cast<uint32_t>(0, game.tilemap.lastTileIndex - game.tilemap.firstTileIndex));
 		std::uniform_real_distribution<float> rndFDist(0.0f, 100.0f);
 		// @todo: generate border to see how tile map size works
 		uint32_t tileCounter{ 0 };
 		uint32_t tileType{ 0 }, nextTielType{ 0 };
 		uint32_t x{ 0 }, y{ 0 };
-		for (size_t i = 0; i < tilemap.width * tilemap.height; i++) {
+		for (size_t i = 0; i < game.tilemap.width * game.tilemap.height; i++) {
 			tileType = 0;
-			if (tileCounter >= tilemap.width * 8) {
+			if (tileCounter >= game.tilemap.width * 8) {
 //				tileType = rndTile(game.randomEngine);
 				tileCounter = 0;
 			}
 			//tileType = rndTile(game.randomEngine);
 			//if ((x == tileMap.width / 2) || (y  == tileMap.height / 2)) {
-			if (x == 0 || x == tilemap.width - 1 || y == 0 || y == tilemap.height - 1)
+			if (x == 0 || x == game.tilemap.width - 1 || y == 0 || y == game.tilemap.height - 1)
 			{
 				tileType = 3;
 			}
@@ -340,7 +343,7 @@ public:
 			texBuffer[i] = tileType;
 			tileCounter++;
 			x++;
-			if (x >= tilemap.width) {
+			if (x >= game.tilemap.width) {
 				x = 0;
 				y++;
 			}
@@ -349,17 +352,17 @@ public:
 		vks::TextureFromBufferCreateInfo texCI = {
 			.buffer = texBuffer,
 			.bufferSize = texBufferSize,
-			.texWidth = tilemap.width,
-			.texHeight = tilemap.height,
+			.texWidth = game.tilemap.width,
+			.texHeight = game.tilemap.height,
 			.format = VK_FORMAT_R32_UINT,
 			.imageUsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
 			.createSampler = false,
 			.magFilter = VK_FILTER_NEAREST,
 			.minFilter = VK_FILTER_NEAREST
 		};
-		tilemap.texture = new vks::Texture2D(texCI);
-		textures.push_back(tilemap.texture);
-		tilemap.imageIndex = static_cast<uint32_t>(textures.size() - 1);
+		game.tilemap.texture = new vks::Texture2D(texCI);
+		textures.push_back(game.tilemap.texture);
+		game.tilemap.imageIndex = static_cast<uint32_t>(textures.size() - 1);
 	}
 
 	void updateTextureDescriptor() {
@@ -410,12 +413,12 @@ public:
 			}
 		});
 
-		tilemap.descriptorSetSampler = new DescriptorSet({
+		game.tilemap.descriptorSetSampler = new DescriptorSet({
 			.pool = descriptorPool,
 			.variableDescriptorCount = samplerCount,
 			.layouts = { descriptorSetLayoutSamplers->handle },
 			.descriptors = {
-				{.dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .pImageInfo = &tilemap.sampler->descriptor},
+				{.dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .pImageInfo = &game.tilemap.sampler->descriptor},
 			}
 		});
 	}
@@ -606,7 +609,7 @@ public:
 
 		game.player.speed = 5.0f;
 		game.player.scale = 1.0f;
-		game.player.position = glm::vec2(-(float)tilemap.width / 2.0f, -(float)tilemap.height / 2.0f);
+		game.player.position = glm::vec2(-(float)game.tilemap.width / 2.0f, -(float)game.tilemap.height / 2.0f);
 		// @todo
 		//game.player.position = glm::vec2((float)tileMap.width - 64.0f, (float)tileMap.height - 64.0f);
 		game.player.position = glm::vec2(0.0f);
@@ -997,15 +1000,15 @@ public:
 			uint32_t uints[2];
 			float floats[2];
 		} pushConsts;
-		pushConsts.uints[0] = tilemap.imageIndex;
-		pushConsts.uints[1] = tilemap.firstTileIndex;
+		pushConsts.uints[0] = game.tilemap.imageIndex;
+		pushConsts.uints[1] = game.tilemap.firstTileIndex;
 		pushConsts.floats[0] = (float)width / 32.0f;
 		pushConsts.floats[1] = (float)height / 32.0f;
 
-		pushConsts.floats[0] = 1024.0f / 32.0f;
-		pushConsts.floats[1] = 1024.0f / 32.0f;
+		pushConsts.floats[0] = 1024.0f / (float)visibleTileCount;
+		pushConsts.floats[1] = 1024.0f / (float)visibleTileCount;
 
-		cb->bindDescriptorSets(pipelineLayouts["tilemap"], { descriptorSetTextures, tilemap.descriptorSetSampler, frame.descriptorSet });
+		cb->bindDescriptorSets(pipelineLayouts["tilemap"], { descriptorSetTextures, game.tilemap.descriptorSetSampler, frame.descriptorSet });
 		cb->bindPipeline(pipelines["tilemap"]);
 		cb->updatePushConstant(pipelineLayouts["tilemap"], 0, &pushConsts);
 		cb->draw(3, 1, 0, 0);
@@ -1126,6 +1129,8 @@ public:
 		ImGui::SetNextWindowSize(ImVec2(0, 50), ImGuiSetCond_FirstUseEver);
 		ImGui::Begin("Player");
 		ImGui::Text("Pos: %.2f / %.2f", game.player.position.x, game.player.position.y);
+		glm::ivec2 tilePos = game.tilemap.tilePosFromVisualPos(game.player.position + 0.5f);
+		ImGui::Text("Tile: %d / %d", tilePos.x, tilePos.y);
 		ImGui::Text("XP: %.2f / %d", game.player.experience, game.getNextLevelExp(game.player.level + 1));
 		ImGui::Text("Level: %d", game.player.level);
 		ImGui::Text("Crit chance: %.1f", game.player.criticalChance);

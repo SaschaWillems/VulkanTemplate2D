@@ -10,6 +10,7 @@
 #include "Texture.hpp"
 #include "Sampler.hpp"
 #include "DescriptorSet.hpp"
+#include <glm/glm.hpp>
 
 namespace Game {
 	class Tilemap
@@ -24,7 +25,10 @@ namespace Game {
 		uint32_t lastTileIndex;
 		uint32_t width{ 0 };
 		uint32_t height{ 0 };
+		// Used to calculate actual tile index from visual screen position
+		glm::vec2 screenFactor{ 0.0f };
 		~Tilemap();
 		void setSize(uint32_t width, uint32_t height);
+		glm::ivec2 tilePosFromVisualPos(glm::vec2 visualPos) const;
 	};
 }

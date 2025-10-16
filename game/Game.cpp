@@ -355,17 +355,31 @@ void Game::Game::updateInput(float delta)
 			};
 		}
 	}
+	glm::vec2 playerTilePos = tilemap.tilePosFromVisualPos(player.position);
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
 		player.position.x -= playerSpeed * delta;
+		if (playerTilePos.x < 0.0f) {
+			player.position.x = 0.0f;
+		}
 	}
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
 		player.position.x += playerSpeed * delta;
+		if (player.position.x > (tilemap.width - 1) / tilemap.screenFactor.x) {
+			player.position.x = (tilemap.width - 1) / tilemap.screenFactor.x;
+		}
 	}
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
 		player.position.y -= playerSpeed * delta;
+		if (playerTilePos.y < 0.0f) {
+			player.position.y = 0.0f;
+		}
 	}
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
 		player.position.y += playerSpeed * delta;
+		if (player.position.y > (tilemap.height - 1) / tilemap.screenFactor.y) {
+			// @todo
+			player.position.y = (tilemap.height - 1) / tilemap.screenFactor.y;
+		}
 	}
 }
 

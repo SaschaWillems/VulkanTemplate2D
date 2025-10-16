@@ -21,6 +21,7 @@
 #include "entities/Projectile.hpp"
 #include "entities/Pickup.hpp"
 #include "entities/Number.hpp"
+#include "Tilemap.hpp"
 
 #include "AudioManager.h"
 
@@ -41,6 +42,7 @@ namespace Game {
 		std::vector<Entities::Pickup> pickups;
 		std::vector<Entities::Number> numbers;
 		Entities::Player player;
+		Tilemap tilemap;
 
 		glm::vec2 playFieldSize;
 
