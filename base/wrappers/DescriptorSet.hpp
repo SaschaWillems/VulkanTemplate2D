@@ -97,4 +97,18 @@ public:
 			}
 		}
 	}
+
+	void updateDescriptor(uint32_t binding, VkDescriptorType type, VkDescriptorBufferInfo* bufferInfo, uint32_t descriptorCount = 1) {
+		VkWriteDescriptorSet writeDescriptorSet{};
+		for (auto& descriptor : descriptors) {
+			if (descriptor.dstBinding == binding) {
+				descriptor.descriptorType = type;
+				descriptor.pBufferInfo = bufferInfo;
+				descriptor.descriptorCount = descriptorCount;
+				descriptor.dstSet = descriptor.dstSet;
+				vkUpdateDescriptorSets(VulkanContext::device->logicalDevice, 1, &descriptor, 0, nullptr);
+				break;
+			}
+		}
+	}
 };

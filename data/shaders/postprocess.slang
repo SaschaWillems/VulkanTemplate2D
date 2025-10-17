@@ -9,13 +9,24 @@ struct UBO
     float4x4 mvp;
     float time;
     float timer;
-    float _notused0;
+    float _unused0;
     float postProcessTimer;
+    float2 playerPos;
+    float2 screenDim;
+    float2 tilemapDim;
+    uint32_t lightCount;
 };
-
-cbuffer ubo { UBO ubo; }
+ConstantBuffer<UBO> ubo;
 
 [[vk::binding(0, 1)]] Sampler2D inputImage;
+
+struct LightSource {
+    float2 pos;
+    float3 color;
+    float radius;
+};
+[[vk::binding(0, 2)]]
+StructuredBuffer<LightSource> lights;
 
 struct VSOutput
 {
@@ -38,7 +49,7 @@ float3 fade(float3 color, float factor)
 [shader("vertex")]
 VSOutput main(uint VertexIndex : SV_VertexID)
 {
-	VSOutput output = (VSOutput)0;
+	VSOutput output;
 	output.UV = float2((VertexIndex << 1) & 2, VertexIndex & 2);
 	output.Pos = float4(output.UV * 2.0f + -1.0f, 0.0f, 1.0f);
 	return output;
@@ -47,10 +58,23 @@ VSOutput main(uint VertexIndex : SV_VertexID)
 [shader("fragment")]
 float4 main(VSOutput input, uniform int effect)
 {
-    float3 inputColor = inputImage.Sample(input.UV).rgb;
-    inputColor = desaturate(inputColor, 0.3);
-    if (effect == 1) {
-        inputColor = fade(inputColor, ubo.postProcessTimer);
+    float3 texSample = inputImage.Sample(input.UV).rgb;
+
+    float3 color = texSample.rgb * 0.03f;
+
+    // Add light colors together
+    for (uint32_t i = 0; i < ubo.lightCount; i++) {
+        float atten = min(length(input.UV - lights[i].pos), lights[i].radius) / lights[i].radius;
+        atten = pow(atten, 0.5);
+        atten = 1.0f - atten;
+        color += lights[i].color * texSample.rgb * atten;
     }
-    return float4(inputColor, 1.0);
+
+    //color = texSample.rgb;
+    float3 finalColor = desaturate(color, 0.3);
+    if (effect == 1) {
+        finalColor = fade(finalColor, ubo.postProcessTimer);
+    }
+
+    return float4(finalColor, 1.0);
 }

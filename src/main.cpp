@@ -23,7 +23,7 @@
 // @todo: sync2 everywhere
 // @todo: timeline semaphores
 
-#define _USE_REBAR
+#define USE_REBAR
 
 #ifdef TRACY_ENABLE
 void* operator new(size_t count)
@@ -51,6 +51,7 @@ struct ShaderData {
 	glm::vec2 playerPos{ 0.0f };
 	glm::vec2 screenDim{ 0.0f };
 	glm::vec2 tilemapDim{ 0.0f };
+	uint32_t lightCount{ 0 };
 } shaderData;
 
 struct Vertex {
@@ -63,6 +64,12 @@ struct InstanceData {
 	float scale{ 1.0f };
 	uint32_t imageIndex{ 0 };
 	uint32_t effect{ 0 };
+};
+
+struct LightSource {
+	alignas(16) glm::vec2 pos{ 0.0f };
+	alignas(16) glm::vec3 color{ 1.0f };
+	float radius;
 };
 
 enum class PostProcessEffect {
@@ -79,11 +86,20 @@ private:
 	struct FrameObjects : public VulkanFrameObjects {
 		Buffer* uniformBuffer{ nullptr };
 		DescriptorSet* descriptorSet{ nullptr };
+
 		Buffer* instanceBuffer{ nullptr };
 		uint32_t instanceBufferSize{ 0 };
 		uint32_t instanceBufferDrawCount{ 0 };
 		uint32_t instanceBufferMaxCount{ 0 };
 		InstanceData* instances{nullptr};
+
+		LightSource* lights{ nullptr };
+		uint32_t lightsBufferSize{ 0 };
+		uint32_t lightsBufferDrawCount{ 0 };
+		uint32_t lightsBufferMaxCount{ 0 };
+		Buffer* lightsBuffer{ nullptr };
+		DescriptorSet* descriptorSetLights{ nullptr };
+
 		// @todo: Separate projectiles into own set of instance buffers (due to different update frequency?)
 		//struct Projectiles {
 		//	Buffer* instanceBuffer{ nullptr };
@@ -101,16 +117,16 @@ private:
 	std::vector<VkDescriptorImageInfo> textureDescriptors{};
 	std::vector<VkDescriptorImageInfo> samplerDescriptors{};
 	std::vector<vks::Texture2D*> textures{};
-	Game::Tilemap tilemap;
 	Sampler* spriteSampler{ nullptr };
 	Sampler* renderImageSampler{ nullptr };
-	
+
 	std::vector<FrameObjects> frameObjects;
 	FileWatcher* fileWatcher{ nullptr };
 	DescriptorPool* descriptorPool;
 	DescriptorSetLayout* descriptorSetLayoutUniforms;
 	DescriptorSetLayout* descriptorSetLayoutSamplers;
 	DescriptorSetLayout* descriptorSetLayoutTextures;
+	DescriptorSetLayout* descriptorSetLayoutLights;
 	DescriptorSetLayout* descriptorSetLayoutRenderImage;
 	DescriptorSet* descriptorSetTextures;
 	DescriptorSet* descriptorSetSamplers;
@@ -160,6 +176,7 @@ public:
 			destroyBaseFrameObjects(frame);
 			delete frame.uniformBuffer;
 			delete frame.instanceBuffer;
+			delete frame.lightsBuffer;
 			delete[] frame.instances;
 		}
 		delete stagingBuffer;
@@ -589,6 +606,104 @@ public:
 		frame.instanceBufferSize = instanceBufferSize;
 	}
 
+	void updateLightsBuffer(FrameObjects& frame)
+	{
+		const uint32_t maxLightsCount =
+			static_cast<uint32_t>(game.projectiles.size()) +
+			// Player light
+			1;
+
+		// Only recreate buffer if necessary, resizing is done in "chunks" to avoid frequent resizes
+		const int32_t minLightBufferCount = std::max(maxLightsCount + instanceBufferBlockSizeIncrease - 1 - (maxLightsCount + instanceBufferBlockSizeIncrease - 1) % instanceBufferBlockSizeIncrease, instanceBufferBlockSizeIncrease);
+		if (frame.lightsBufferMaxCount < minLightBufferCount) {
+			std::cout << "Resizing lights buffer for frame " << frame.index << " to " << minLightBufferCount << " elements\n";
+			// Host
+			delete[] frame.lights;
+			frame.lights = new LightSource[minLightBufferCount];
+			// Device
+			delete frame.lightsBuffer;
+			frame.lightsBuffer = new Buffer({
+				.usageFlags = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				.size = minLightBufferCount * sizeof(LightSource),
+#if defined(USE_REBAR)
+				.vmaAllocFlags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT,
+				.map = true,
+#endif
+				});
+#if defined(USE_REBAR)
+			VkMemoryPropertyFlags memPropFlags;
+			vmaGetAllocationMemoryProperties(VulkanContext::vmaAllocator, frame.lightsBuffer->bufferAllocation, &memPropFlags);
+			// @todo: fall back to staging if no ReBAR
+			assert(memPropFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+#endif
+			frame.lightsBufferMaxCount = minLightBufferCount;
+		}
+
+		// Gather lights to be drawn
+		uint32_t lightIndex{ 0 };
+
+		// Post process uses a different aspect ratio than internal rendering, which needs to be taken into account
+		float postProcessAR = (float)width / ((float)height * 4.0f / 3.0f);
+
+		// Projectiles (@todo: maybe separate into own light buffer due to diff. update frequency)
+		for (auto i = 0; i < game.projectiles.size(); i++) {
+			Game::Entities::Projectile& projectile = game.projectiles[i];
+			if (projectile.state == Game::Entities::State::Dead) {
+				continue;
+			}
+			// Must be relative to the player (which in turn is centered on the screen)
+			glm::vec2 lPos = projectile.position - game.player.position;
+			lPos /= (screenDim * 2.0f);
+			lPos.x /= postProcessAR;
+			lPos += 0.5;
+			frame.lights[lightIndex++] = {
+				.pos = lPos,
+				.color = glm::vec3(0.0f, 0.0f, 25.0f),
+				.radius = 0.04f,
+			};
+		}
+
+		// Player
+		frame.lights[lightIndex++] = {
+			.pos = glm::vec2(0.5),
+			.color = glm::vec3(1.0f),
+			.radius = 0.2f,
+		};
+
+		frame.lightsBufferDrawCount = lightIndex;
+
+		assert(frame.lightsBufferDrawCount > 0);
+
+		const size_t lightBufferSize = frame.lightsBufferDrawCount * sizeof(LightSource);
+#if defined(USE_REBAR)
+		memcpy(frame.lightsBuffer->mapped, &frame.lights[0], lightBufferSize);
+#else
+		stagingBuffer->copyTo(frame.lights, lightsBufferSize);
+		if (!copyCommandBuffer) {
+			copyCommandBuffer = new CommandBuffer({ .device = *vulkanDevice, .pool = commandPool });
+		}
+		copyCommandBuffer->begin();
+		VkBufferCopy bufferCopy = { .size = lightBufferSize };
+		vkCmdCopyBuffer(copyCommandBuffer->handle, stagingBuffer->buffer, frame.lightsBuffer->buffer, 1, &bufferCopy);
+		copyCommandBuffer->end();
+		copyCommandBuffer->oneTimeSubmit(queue);
+#endif
+		frame.lightsBufferSize = lightBufferSize;		
+
+		if (!frame.descriptorSetLights) {
+			frame.descriptorSetLights = new DescriptorSet({
+				.pool = descriptorPool,
+				.layouts = { descriptorSetLayoutLights->handle },
+				.descriptors = {
+					{.dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .pBufferInfo = &frame.lightsBuffer->descriptor }
+				}
+			});
+		}
+		else {
+			frame.descriptorSetLights->updateDescriptor(0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &frame.lightsBuffer->descriptor);
+		}
+	}
+
 	void prepare() {
 		VulkanApplication::prepare();
 
@@ -644,12 +759,13 @@ public:
 				{.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = 4096 /*@todo*/},
 				{.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 256 /*@todo*/},
 				{.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .descriptorCount = 4 /*@todo*/},
+				{.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 4 /*@todo*/},
 			}
 		});
 
 		descriptorSetLayoutUniforms = new DescriptorSetLayout({
 			.bindings = {
-				{.binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT }
+				{ .binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT },
 			}
 		});
 
@@ -658,10 +774,16 @@ public:
 				.pool = descriptorPool,
 				.layouts = { descriptorSetLayoutUniforms->handle },
 				.descriptors = {
-					{.dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .pBufferInfo = &frame.uniformBuffer->descriptor }
+					{.dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .pBufferInfo = &frame.uniformBuffer->descriptor },
 				}
 			});
 		}
+
+		descriptorSetLayoutLights = new DescriptorSetLayout({
+			.bindings = {
+				{ .binding = 0, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 1, .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT },
+			}
+		});
 		
 		updateTextureDescriptor();
 
@@ -824,14 +946,14 @@ public:
 
 		descriptorSetRenderImage = new DescriptorSet({
 			.pool = descriptorPool,
-			.layouts = { descriptorSetLayoutRenderImage->handle },
+			.layouts = { descriptorSetLayoutRenderImage->handle, descriptorSetLayoutLights->handle },
 			.descriptors = {
 				{.dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &renderImageDesc}
 			}
 		});
 
 		pipelineLayouts["postprocess"] = new PipelineLayout({
-			.layouts = { descriptorSetLayoutUniforms->handle, descriptorSetLayoutRenderImage->handle,  },
+			.layouts = { descriptorSetLayoutUniforms->handle, descriptorSetLayoutRenderImage->handle, descriptorSetLayoutLights->handle },
 			// Used to select the current post process effect
 			.pushConstantRanges = {
 				{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = sizeof(int32_t)}
@@ -1039,7 +1161,7 @@ public:
 		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		cb->beginRendering(renderingInfo);
 		cb->setViewport(0.0f, 0.0f, width, height, 0.0f, 1.0f);
-		cb->bindDescriptorSets(pipelineLayouts["postprocess"], { frame.descriptorSet, descriptorSetRenderImage });
+		cb->bindDescriptorSets(pipelineLayouts["postprocess"], { frame.descriptorSet, descriptorSetRenderImage, frame.descriptorSetLights });
 		cb->bindPipeline(pipelines["postprocess"]);
 		cb->updatePushConstant(pipelineLayouts["postprocess"], 0, &postProcessEffect);
 		cb->draw(3, 1, 0, 0);
@@ -1086,6 +1208,10 @@ public:
 			ZoneScopedN("Instance buffer update");
 			updateInstanceBuffer(currentFrame);
 		}
+		{
+			ZoneScopedN("Lights buffer update");
+			updateLightsBuffer(currentFrame);
+		}
 
 		updatePostProcessEffect(frameTimer);
 
@@ -1095,6 +1221,7 @@ public:
 		shaderData.mvp *= glm::ortho(-screenDim.x, screenDim.x, -screenDim.x, screenDim.x);
 		shaderData.playerPos = game.player.position;
 		shaderData.screenDim = screenDim;
+		shaderData.lightCount = currentFrame.lightsBufferDrawCount;
 		memcpy(currentFrame.uniformBuffer->mapped, &shaderData, sizeof(ShaderData)); // @todo: buffer function
 
 		recordCommandBuffer(currentFrame);

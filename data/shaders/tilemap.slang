@@ -24,23 +24,26 @@ struct UBO
     float2 playerPos;
     float2 screenDim;
     float2 tilemapDim;
+    uint32_t lightCount;
 };
 [[vk::binding(0, 2)]]
-ConstantBuffer<UBO> ubo : register(b0, space2);
+ConstantBuffer<UBO> ubo;
 
 struct VSOutput
 {
 	float4 pos : SV_POSITION;
-[[vk::location(0)]] float2 uv : TEXCOORD0;
-[[vk::location(1)]] float4 color : COLOR0;
-[[vk::location(2)]] nointerpolation int textureIndex : TEXCOORD1;
+    float2 uv;
+    float2 uvbase;
+    float4 color;
+    nointerpolation int textureIndex;
 };
 
 [shader("vertex")]
-VSOutput main(/*VSInput input, */ uint VertexIndex : SV_VertexID)
+VSOutput main(uint VertexIndex : SV_VertexID)
 {
     VSOutput output;
     float2 uv = float2((VertexIndex << 1) & 2, VertexIndex & 2);
+    output.uvbase = uv;
     output.uv = float2(uv.x - 0.5, uv.y - 0.5);
     output.uv += ubo.playerPos / (ubo.screenDim * 2.0f);
     output.pos = float4(uv * 2.0f + -1.0f, 0.0f, 1.0f);
@@ -48,7 +51,7 @@ VSOutput main(/*VSInput input, */ uint VertexIndex : SV_VertexID)
 }
 
 [shader("fragment")]
-float4 main(VSOutput input) : SV_TARGET
+float4 main(VSOutput input)
 {
     const float2 _div = float2(pushConsts.tileCountX, pushConsts.tileCountY);
     float2 uv = input.uv * _div;
@@ -61,6 +64,5 @@ float4 main(VSOutput input) : SV_TARGET
     float2 locuv = uv;
     locuv.x = fmod(uv.x, 1.0);
     locuv.y = fmod(uv.y, 1.0);
-    float4 color = textures[texIdx].Sample(samplers[0], locuv);
-    return color;
+    return textures[texIdx].Sample(samplers[0], locuv);
 }
