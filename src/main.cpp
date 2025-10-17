@@ -46,7 +46,7 @@ struct ShaderData {
 	glm::mat4 mvp;
 	float time{ 0.0f };
 	float timer{ 0.0f };
-	float _unused;
+	float viewportAR;
 	float postProcessTimer{ 0.0f };
 	glm::vec2 playerPos{ 0.0f };
 	glm::vec2 screenDim{ 0.0f };
@@ -1222,6 +1222,9 @@ public:
 		shaderData.playerPos = game.player.position;
 		shaderData.screenDim = screenDim;
 		shaderData.lightCount = currentFrame.lightsBufferDrawCount;
+		float vpHeight = (float)height;
+		float vpWidth = vpHeight * 4.0f / 3.0f;
+		shaderData.viewportAR = (4.0f / 3.0f) * ((float)width/vpWidth);
 		memcpy(currentFrame.uniformBuffer->mapped, &shaderData, sizeof(ShaderData)); // @todo: buffer function
 
 		recordCommandBuffer(currentFrame);

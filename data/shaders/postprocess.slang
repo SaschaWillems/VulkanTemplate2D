@@ -9,7 +9,7 @@ struct UBO
     float4x4 mvp;
     float time;
     float timer;
-    float _unused0;
+    float viewportAR;
     float postProcessTimer;
     float2 playerPos;
     float2 screenDim;
@@ -64,7 +64,9 @@ float4 main(VSOutput input, uniform int effect)
 
     // Add light colors together
     for (uint32_t i = 0; i < ubo.lightCount; i++) {
-        float atten = min(length(input.UV - lights[i].pos), lights[i].radius) / lights[i].radius;
+        float2 l = input.UV - lights[i].pos;
+        l.x *= ubo.viewportAR;
+        float atten = min(length(l), lights[i].radius) / lights[i].radius;
         atten = pow(atten, 0.5);
         atten = 1.0f - atten;
         color += lights[i].color * texSample.rgb * atten;
