@@ -311,6 +311,9 @@ void Game::Game::update(float delta)
 				}
 				for (auto i = start; i < end; i++) {
 					Entities::Monster& monster = monsters[i];
+					if (monster.state == Entities::State::Dead) {
+						continue;
+					}
 					// @todo: simple "logic" for testing
 					// @todo: Use velocity
 					// Monsters far away respawn outside of the view
