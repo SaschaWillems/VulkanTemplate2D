@@ -18,6 +18,7 @@ namespace Game {
 			float criticalDamageMultiplier{ 1.5f };
 			float stamina{ 2.5f };
 			float maxStamina{ 2.5f };
+			float pickupDistance{ 3.0f };
 			void addExperience(float value);
 		};
 	}

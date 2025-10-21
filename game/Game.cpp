@@ -253,7 +253,7 @@ void Game::Game::update(float delta)
 				// Experience moves towards the player once he gets in pickup range
 				// @todo: Pickup range as property of player
 				if (pickup.type == Entities::Pickup::Type::Experience) {
-					if (glm::distance(pickup.position, player.position) < 3.0f) {
+					if (glm::distance(pickup.position, player.position) < player.pickupDistance) {
 						pickup.direction = glm::normalize(player.position - pickup.position);
 						// @todo: pickup speed adjustments
 						pickup.position += pickup.direction * pickup.speed * delta;
