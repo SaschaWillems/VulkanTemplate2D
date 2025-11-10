@@ -50,6 +50,7 @@ struct ShaderData {
 	float postProcessTimer{ 0.0f };
 	glm::vec2 playerPos{ 0.0f };
 	glm::vec2 screenDim{ 0.0f };
+	glm::vec2 screenRes{ 0.0f };
 	glm::vec2 tilemapDim{ 0.0f };
 	uint32_t lightCount{ 0 };
 } shaderData;
@@ -1221,6 +1222,7 @@ public:
 		shaderData.mvp *= glm::ortho(-screenDim.x, screenDim.x, -screenDim.x, screenDim.x);
 		shaderData.playerPos = game.player.position;
 		shaderData.screenDim = screenDim;
+		shaderData.screenRes = glm::vec2((float)width, (float)height);
 		shaderData.lightCount = currentFrame.lightsBufferDrawCount;
 		float vpHeight = (float)height;
 		float vpWidth = vpHeight * 4.0f / 3.0f;

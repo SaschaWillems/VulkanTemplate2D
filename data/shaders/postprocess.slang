@@ -13,6 +13,7 @@ struct UBO
     float postProcessTimer;
     float2 playerPos;
     float2 screenDim;
+    float2 screenRes;
     float2 tilemapDim;
     uint32_t lightCount;
 };
@@ -46,6 +47,25 @@ float3 fade(float3 color, float factor)
     return color * factor;
 }
 
+// From https://babylonjs.medium.com/retro-crt-shader-a-post-processing-effect-study-1cb3f783afbc
+float2 curveRemapUV(float2 uv)
+{
+    const float2 curvature = float2(3.5);
+    uv = uv * 2.0 - 1.0;
+    float2 offset = abs(uv.yx) / float2(curvature.x, curvature.y);
+    uv = uv + uv * offset * offset;
+    uv = uv * 0.5 + 0.5;
+    return uv;
+}
+
+// From https://babylonjs.medium.com/retro-crt-shader-a-post-processing-effect-study-1cb3f783afbc
+float4 scanLineIntensity(float uv, float resolution, float opacity)
+{
+    float intensity = sin(uv * resolution * float.getPi() * 2.0);
+    intensity = ((0.5 * intensity) + 0.5) * 0.9 + 0.1;
+    return float4(float3(pow(intensity, opacity)), 1.0);
+}
+
 [shader("vertex")]
 VSOutput main(uint VertexIndex : SV_VertexID)
 {
@@ -58,13 +78,17 @@ VSOutput main(uint VertexIndex : SV_VertexID)
 [shader("fragment")]
 float4 main(VSOutput input, uniform int effect)
 {
-    float3 texSample = inputImage.Sample(input.UV).rgb;
+    // CRT curvature
+    float2 uv = curveRemapUV(input.UV);
 
-    float3 color = texSample.rgb * 0.03f;
+    float3 texSample = inputImage.Sample(uv).rgb;
+    // @todo: pass as value (day/night cycle)
+    const float ambient = 0.03;
+    float3 color = texSample.rgb * ambient;
 
     // Add light colors together
     for (uint32_t i = 0; i < ubo.lightCount; i++) {
-        float2 l = input.UV - lights[i].pos;
+        float2 l = uv - lights[i].pos;
         l.x *= ubo.viewportAR;
         float atten = min(length(l), lights[i].radius) / lights[i].radius;
         atten = pow(atten, 0.5);
@@ -77,6 +101,10 @@ float4 main(VSOutput input, uniform int effect)
     if (effect == 1) {
         finalColor = fade(finalColor, ubo.postProcessTimer);
     }
+
+    // CRT scanlines
+    finalColor *= scanLineIntensity(uv.x, ubo.screenRes.y, 0.5).xyz;
+    finalColor *= scanLineIntensity(uv.y, ubo.screenRes.x, 0.5).xyz;
 
     return float4(finalColor, 1.0);
 }

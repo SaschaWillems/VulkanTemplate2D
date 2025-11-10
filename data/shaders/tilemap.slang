@@ -23,6 +23,7 @@ struct UBO
     float _unused0;
     float2 playerPos;
     float2 screenDim;
+    float2 screenRes;
     float2 tilemapDim;
     uint32_t lightCount;
 };
