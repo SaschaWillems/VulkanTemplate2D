@@ -179,6 +179,15 @@ void Game::Game::update(float delta)
 	// @todo: totally work in progress
 	// @todo: use multi threading
 
+	float dayNightSpeed = 0.015f;
+	// Make nights last longer
+	if (dayNightCycle < 0.25f || dayNightCycle > 1.75f) {
+		dayNightSpeed = 0.005f;
+	}
+	dayNightCycle += delta * dayNightSpeed;
+	if (dayNightCycle > 2.0f) {
+		dayNightCycle = dayNightCycle - 2.0f;
+	}
 
 	currentRun.update(delta);
 

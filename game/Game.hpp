@@ -63,6 +63,8 @@ namespace Game {
 		float playerFireTimer{ 0.0f };
 		float playerFireTimerDuration{ 5.0f };
 
+		float dayNightCycle{ 0.0f };
+
 		Run currentRun;
 
 		Game();

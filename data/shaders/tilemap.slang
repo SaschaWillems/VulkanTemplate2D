@@ -26,6 +26,7 @@ struct UBO
     float2 screenRes;
     float2 tilemapDim;
     uint32_t lightCount;
+    float dayNightCycle;
 };
 [[vk::binding(0, 2)]]
 ConstantBuffer<UBO> ubo;

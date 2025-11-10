@@ -53,6 +53,7 @@ struct ShaderData {
 	glm::vec2 screenRes{ 0.0f };
 	glm::vec2 tilemapDim{ 0.0f };
 	uint32_t lightCount{ 0 };
+	float dayNightCycle{ 0.0f };
 } shaderData;
 
 struct Vertex {
@@ -1224,6 +1225,7 @@ public:
 		shaderData.screenDim = screenDim;
 		shaderData.screenRes = glm::vec2((float)width, (float)height);
 		shaderData.lightCount = currentFrame.lightsBufferDrawCount;
+		shaderData.dayNightCycle = game.dayNightCycle <= 1.0f ? game.dayNightCycle : 2.0 - game.dayNightCycle;
 		float vpHeight = (float)height;
 		float vpWidth = vpHeight * 4.0f / 3.0f;
 		shaderData.viewportAR = (4.0f / 3.0f) * ((float)width/vpWidth);

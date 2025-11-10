@@ -16,6 +16,7 @@ struct UBO
     float2 screenRes;
     float2 tilemapDim;
     uint32_t lightCount;
+    float dayNightCycle;
 };
 ConstantBuffer<UBO> ubo;
 
@@ -82,9 +83,7 @@ float4 main(VSOutput input, uniform int effect)
     float2 uv = curveRemapUV(input.UV);
 
     float3 texSample = inputImage.Sample(uv).rgb;
-    // @todo: pass as value (day/night cycle)
-    const float ambient = 0.03;
-    float3 color = texSample.rgb * ambient;
+    float3 color = texSample.rgb * ubo.dayNightCycle;
 
     // Add light colors together
     for (uint32_t i = 0; i < ubo.lightCount; i++) {
