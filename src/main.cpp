@@ -289,6 +289,7 @@ public:
 		loadTexture(getAssetPath() + "game/tiles/set0/grass0-dirt-mix_1.png", game.tilemap.lastTileIndex);
 		loadTexture(getAssetPath() + "game/tiles/set0/grass_full_old.png", game.tilemap.lastTileIndex);
 		loadTexture(getAssetPath() + "game/tiles/set0/shallow_water.png", game.tilemap.lastTileIndex);
+		loadTexture(getAssetPath() + "game/crtframe.png", crtFrameImageIndex);
 
 		SamplerCreateInfo samplerCI {
 			.name = "Sprite sampler",
@@ -922,6 +923,71 @@ public:
 		});
 		pipelineList.push_back(pipelines["tilemap"]);
 
+		// CRT frame
+		VkPipelineColorBlendAttachmentState blendAttachmentStateEnabled{
+			.blendEnable = VK_TRUE,
+			.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+			.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+			.colorBlendOp = VK_BLEND_OP_ADD,
+			.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+			.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+			.alphaBlendOp = VK_BLEND_OP_ADD,
+			.colorWriteMask = 0xf,
+		};
+
+		pipelineLayouts["crtframe"] = new PipelineLayout({
+			.layouts = { descriptorSetLayoutTextures->handle, descriptorSetLayoutSamplers->handle, descriptorSetLayoutUniforms->handle },
+			// Index of the crt frame is passed via push constant
+			.pushConstantRanges = {
+				{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = sizeof(uint32_t) }
+			}
+		});
+
+		pipelines["crtframe"] = new Pipeline({
+			.shaders = {
+				.filename = getAssetPath() + "shaders/frame.slang",
+				.stages = { VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT }
+			},
+			.cache = pipelineCache,
+			.layout = *pipelineLayouts["crtframe"],
+			//.vertexInput = vertexInput,
+			.inputAssemblyState = {
+				.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+			},
+			.viewportState = {
+				.viewportCount = 1,
+				.scissorCount = 1
+			},
+			.rasterizationState = {
+				.polygonMode = VK_POLYGON_MODE_FILL,
+				.cullMode = VK_CULL_MODE_BACK_BIT,
+				.frontFace = VK_FRONT_FACE_CLOCKWISE,
+				.lineWidth = 1.0f
+			},
+			.multisampleState = {
+				.rasterizationSamples = settings.sampleCount,
+			},
+			.depthStencilState = {
+				.depthTestEnable = VK_FALSE,
+				.depthWriteEnable = VK_FALSE,
+				.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+			},
+			.blending = {
+				.attachments = { blendAttachmentStateEnabled }
+			},
+			.dynamicState = {
+				DynamicState::Scissor,
+				DynamicState::Viewport
+			},
+			.pipelineRenderingInfo = {
+				.colorAttachmentCount = 1,
+				.pColorAttachmentFormats = &swapChain->colorFormat,
+				.depthAttachmentFormat = depthFormat,
+				.stencilAttachmentFormat = depthFormat
+			},
+			.enableHotReload = true
+		});
+		pipelineList.push_back(pipelines["crtframe"]);
 		// Post process
 		descriptorSetLayoutRenderImage = new DescriptorSetLayout({
 			.descriptorIndexing = true,
@@ -1158,14 +1224,21 @@ public:
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			VkImageSubresourceRange{ VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
 
-		// Post process
 		colorAttachment.imageView = swapChain->buffers[swapChain->currentImageIndex].view;
 		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 		cb->beginRendering(renderingInfo);
 		cb->setViewport(0.0f, 0.0f, width, height, 0.0f, 1.0f);
+
+		// Post process
 		cb->bindDescriptorSets(pipelineLayouts["postprocess"], { frame.descriptorSet, descriptorSetRenderImage, frame.descriptorSetLights });
 		cb->bindPipeline(pipelines["postprocess"]);
 		cb->updatePushConstant(pipelineLayouts["postprocess"], 0, &postProcessEffect);
+		cb->draw(3, 1, 0, 0);
+
+		// Backdrop
+		cb->bindDescriptorSets(pipelineLayouts["crtframe"], { descriptorSetTextures, descriptorSetSamplers, frame.descriptorSet });
+		cb->bindPipeline(pipelines["crtframe"]);
+		cb->updatePushConstant(pipelineLayouts["crtframe"], 0, &crtFrameImageIndex);
 		cb->draw(3, 1, 0, 0);
 		if (overlay->visible) {
 			overlay->draw(cb, getCurrentFrameIndex());
