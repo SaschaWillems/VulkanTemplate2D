@@ -284,11 +284,13 @@ public:
 		loadTexture(getAssetPath() + "game/pickups/misc_crystal_old.png", game.experienceImageIndex);
 
 		// @todo: tile map
+		const std::string tileSet{ "set0" };
 		uint32_t dummyIdx;
-		loadTexture(getAssetPath() + "game/tiles/set0/grass_0_new.png", game.tilemap.firstTileIndex);
-		loadTexture(getAssetPath() + "game/tiles/set0/grass0-dirt-mix_1.png", game.tilemap.lastTileIndex);
-		loadTexture(getAssetPath() + "game/tiles/set0/grass_full_old.png", game.tilemap.lastTileIndex);
-		loadTexture(getAssetPath() + "game/tiles/set0/shallow_water.png", game.tilemap.lastTileIndex);
+		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/empty.png");
+		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/floor00.png", game.tilemap.firstTileIndex);
+		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/floor01.png", game.tilemap.lastTileIndex);
+		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/floor02.png", game.tilemap.lastTileIndex);
+		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/water.png", game.tilemap.lastTileIndex);
 		loadTexture(getAssetPath() + "game/crtframe.png", crtFrameImageIndex);
 
 		SamplerCreateInfo samplerCI {
