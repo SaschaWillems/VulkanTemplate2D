@@ -124,15 +124,15 @@ private:
 
 	std::vector<FrameObjects> frameObjects;
 	FileWatcher* fileWatcher{ nullptr };
-	DescriptorPool* descriptorPool;
-	DescriptorSetLayout* descriptorSetLayoutUniforms;
-	DescriptorSetLayout* descriptorSetLayoutSamplers;
-	DescriptorSetLayout* descriptorSetLayoutTextures;
-	DescriptorSetLayout* descriptorSetLayoutLights;
-	DescriptorSetLayout* descriptorSetLayoutRenderImage;
-	DescriptorSet* descriptorSetTextures;
-	DescriptorSet* descriptorSetSamplers;
-	DescriptorSet* descriptorSetRenderImage;
+	DescriptorPool* descriptorPool{ nullptr };
+	DescriptorSetLayout* descriptorSetLayoutUniforms{ nullptr };
+	DescriptorSetLayout* descriptorSetLayoutSamplers{ nullptr };
+	DescriptorSetLayout* descriptorSetLayoutTextures{ nullptr };
+	DescriptorSetLayout* descriptorSetLayoutLights{ nullptr };
+	DescriptorSetLayout* descriptorSetLayoutRenderImage{ nullptr };
+	DescriptorSet* descriptorSetTextures{ nullptr };
+	DescriptorSet* descriptorSetSamplers{ nullptr };
+	DescriptorSet* descriptorSetRenderImage{ nullptr };
 	std::unordered_map<std::string, PipelineLayout*> pipelineLayouts;
 	std::unordered_map<std::string, Pipeline*> pipelines;
 	sf::Music backgroundMusic;
@@ -141,6 +141,7 @@ private:
 	PostProcessEffect postProcessEffect{ PostProcessEffect::None };
 	float postProcessTimeFactor{ 1.0f };
 	uint32_t visibleTileCount{ 32 };
+	uint32_t crtFrameImageIndex{ 0 };
 public:	
 	Application() : VulkanApplication() {
 		apiVersion = VK_API_VERSION_1_3;
@@ -792,15 +793,17 @@ public:
 		
 		updateTextureDescriptor();
 
-		VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo{};
-		pipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
-		pipelineRenderingCreateInfo.colorAttachmentCount = 1;
-		pipelineRenderingCreateInfo.pColorAttachmentFormats = &swapChain->colorFormat;
-		pipelineRenderingCreateInfo.depthAttachmentFormat = depthFormat;
-		pipelineRenderingCreateInfo.stencilAttachmentFormat = depthFormat;
+		VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo{
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
+			.colorAttachmentCount = 1,
+			.pColorAttachmentFormats = &swapChain->colorFormat,
+			.depthAttachmentFormat = depthFormat,
+			.stencilAttachmentFormat = depthFormat
+		};
 
-		VkPipelineColorBlendAttachmentState blendAttachmentState{};
-		blendAttachmentState.colorWriteMask = 0xf;
+		VkPipelineColorBlendAttachmentState blendAttachmentState{
+			.colorWriteMask = 0xf
+		};
 
 		// Sprites
 
@@ -1141,13 +1144,14 @@ public:
 			VkImageSubresourceRange{ VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0, 1, 0, 1 });
 
 		// New structures are used to define the attachments used in dynamic rendering
-		colorAttachment = {};
-		colorAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-		colorAttachment.imageView = multiSampling ? multisampleTarget.color.view : renderImage.view;
-		colorAttachment.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR;
-		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		colorAttachment.clearValue.color = { 0.0f, 0.0f, 0.0f, 0.0f };
+		colorAttachment = {
+			.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
+			.imageView = multiSampling ? multisampleTarget.color.view : renderImage.view,
+			.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL_KHR,
+			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+			.clearValue = {.color = { 0.0f, 0.0f, 0.0f, 0.0f } },
+		};
 		if (multiSampling) {
 			colorAttachment.resolveImageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
 			colorAttachment.resolveImageView = swapChain->buffers[swapChain->currentImageIndex].view;
@@ -1156,13 +1160,14 @@ public:
 
 		// A single depth stencil attachment info can be used, but they can also be specified separately.
 		// When both are specified separately, the only requirement is that the image view is identical.			
-		depthStencilAttachment = {};
-		depthStencilAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-		depthStencilAttachment.imageView = multiSampling ? multisampleTarget.depth.view : depthStencil.view;
-		depthStencilAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL;
-		depthStencilAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		depthStencilAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		depthStencilAttachment.clearValue.depthStencil = { 1.0f,  0 };
+		depthStencilAttachment = {
+			.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
+			.imageView = multiSampling ? multisampleTarget.depth.view : depthStencil.view,
+			.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL,
+			.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+			.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+			.clearValue = {.depthStencil = {1.0f,  0} },
+		};
 		if (multiSampling) {
 			depthStencilAttachment.resolveImageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
 			depthStencilAttachment.resolveImageView = depthStencil.view;
@@ -1191,7 +1196,7 @@ public:
 		struct PushConsts {
 			uint32_t uints[2];
 			float floats[2];
-		} pushConsts;
+		} pushConsts{};
 		pushConsts.uints[0] = game.tilemap.imageIndex;
 		pushConsts.uints[1] = game.tilemap.firstTileIndex;
 		pushConsts.floats[0] = (float)width / 32.0f;
