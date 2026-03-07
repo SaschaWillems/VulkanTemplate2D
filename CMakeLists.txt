@@ -33,7 +33,10 @@ include_directories(game)
 OPTION(USE_D2D_WSI "Build the project using Direct to Display swapchain" OFF)
 OPTION(USE_WAYLAND_WSI "Build the project using Wayland swapchain" OFF)
 
-SET(SLANG_COMPILER_LIBRARY "" CACHE FILEPATH "")
+# SET(SLANG_COMPILER_LIBRARY "" CACHE FILEPATH "")
+
+find_library(SLANG_COMPILER_LIBRARY NAMES slang slang-compiler HINTS "$ENV{VULKAN_SDK}/lib")
+
 IF(NOT EXISTS ${SLANG_COMPILER_LIBRARY}) 
 	message(FATAL_ERROR "Slang compiler library not set")
 ENDIF()
