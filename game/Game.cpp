@@ -147,7 +147,7 @@ void Game::Game::playerWeaponTrigger()
 			case 1:
 			{
 				// Single bullet in player direction
-				if (player.direction.length() != 0.0f) {
+				if (glm::length(player.direction) != 0.0f) {
 					spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, player.direction);
 					playSound = true;
 				}
@@ -203,6 +203,8 @@ void Game::Game::monsterProjectileCollisionCheck(Entities::Monster& monster)
 					damage *= player.criticalDamageMultiplier;
 					projectile.effect = Entities::Effect::Critical;
 				}
+				// @todo: Get from weapon for different effects (e.g. for damage types without a moving direction)
+				monster.velocity = projectile.direction * 10.0f;
 				monster.health -= damage;
 				monster.setEffect(Entities::Effect::Hit);
 				spawnNumber(damage, monster.position, projectile.effect);
@@ -345,6 +347,11 @@ void Game::Game::update(float delta)
 		threadPool.threads[1]->addJob([=] { 
 			for (auto i = 0; i < projectiles.size(); i++) {
 				Entities::Projectile& projectile = projectiles[i];
+				// @todo: update function
+				if (projectile.type == Entities::ProjectileType::Homing) {
+					// @todo: what to do if target has died?
+					projectile.direction = glm::normalize(projectile.target.value().position - projectile.position);
+				}
 				projectile.position += projectile.direction * projectile.speed * delta;
 				projectile.life -= delta * 50.0f;
 				if (projectile.life <= 0.0f) {
@@ -391,6 +398,10 @@ void Game::Game::update(float delta)
 					};
 					monster.direction = glm::normalize(player.position - monster.position);
 					monster.position += monster.direction * monster.speed * delta;
+					if (glm::length(monster.velocity) > 0.1f) {
+						monster.position += monster.velocity * delta * 100.0f;
+						monster.velocity *= 0.01f * delta;
+					}
 					monsterProjectileCollisionCheck(monster);
 				}
 			});

@@ -32,8 +32,10 @@ namespace Game {
 		public:
 			glm::vec2 position{};
 			glm::vec2 direction{};
+			glm::vec2 velocity{};
 			float timer{ 0.0f };
 			float health{ 100.0f };
+			float maxHealth{ 100.0f };
 			float speed{ 1.0f };
 			float scale{ 1.0f };
 			// @todo: archetype instead
