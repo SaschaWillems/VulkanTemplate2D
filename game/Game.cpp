@@ -64,7 +64,7 @@ void Game::Game::spawnMonsters(uint32_t count)
 	}
 }
 
-void Game::Game::spawnProjectile(Entities::Source source, uint32_t imageIndex, glm::vec2 position, glm::vec2 direction)
+void Game::Game::spawnProjectile(Entities::Source source, uint32_t imageIndex, glm::vec2 position, glm::vec2 direction, float speed)
 {
 	// @todo: grow in chunks
 	// @todo: Add projectile types with properties like speed, movement pattern, damage, source, tc.
@@ -75,7 +75,7 @@ void Game::Game::spawnProjectile(Entities::Source source, uint32_t imageIndex, g
 	projectile.source = source;
 	projectile.damage = 25.0f;
 	projectile.life = 100.0f;
-	projectile.speed = 15.0f;
+	projectile.speed = speed;
 	projectile.scale = 0.5f;
 	projectile.state = Entities::State::Alive;
 	// Replace dead projectiles first
@@ -120,6 +120,45 @@ void Game::Game::spawnNumber(uint32_t value, glm::vec2 position, Entities::Effec
 		}
 	}
 	numbers.push_back(number);
+}
+
+void Game::Game::playerWeaponTrigger()
+{
+	const uint32_t weaponType{ 2 };
+	// @todo: Multiple weapons, each with their own cooldown
+	// @todo: Idea: Just drop in place of player (e.g. a bomb)
+	// @todo: Idea: Rotating patterns (e.g. cross and then rotate that slowly)
+	switch (weaponType) {
+	case 0:
+	{
+		// Single bullet in a random direction
+		std::uniform_real_distribution<float> dirDist(-1.0f, 1.0f);
+		spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, glm::vec2(dirDist(randomEngine), dirDist(randomEngine)));
+		break;
+	}
+	case 1:
+	{
+		// Single bullet in player direction
+		if (player.direction.length() != 0.0f) {
+			spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, player.direction);
+		}
+		break;
+	}
+	case 2:
+	{
+		// Circular pattern
+		playerFireTimerDuration = 15.0f;
+		const uint32_t count{ 16 };
+		const float dist{ 360.0f / (float)count };
+		for (auto i = 0; i < count; i++) {
+			const float angle{ (float)i * dist };
+			const glm::vec2 direction = normalize(glm::vec2(sin(angle * M_PI / 180.0f), cos(angle * M_PI / 180.0f)));
+			spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, direction, 10.0f);
+		}
+		break;
+	}
+	}
+	audioManager->playSnd("laser");
 }
 
 void Game::Game::monsterProjectileCollisionCheck(Entities::Monster& monster)
@@ -195,10 +234,7 @@ void Game::Game::update(float delta)
 	playerFireTimer += delta * 25.0f;
 	if (playerFireTimer > playerFireTimerDuration) {
 		playerFireTimer = 0.0f;
-		std::uniform_real_distribution<float> dirDist(-1.0f, 1.0f);
-		spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, glm::vec2(dirDist(randomEngine), dirDist(randomEngine)));
-		// @todo
-		audioManager->playSnd("laser");
+		playerWeaponTrigger();
 	}
 
 	/*
@@ -367,26 +403,31 @@ void Game::Game::updateInput(float delta)
 			};
 		}
 	}
+	player.direction = glm::vec2(.0f, .0f);
 	glm::vec2 playerTilePos = tilemap.tilePosFromVisualPos(player.position);
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
+		player.direction.x = -1.0f;
 		player.position.x -= playerSpeed * delta;
 		if (playerTilePos.x < 0.0f) {
 			player.position.x = 0.0f;
 		}
 	}
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
+		player.direction.x = 1.0f;
 		player.position.x += playerSpeed * delta;
 		if (player.position.x > (tilemap.width - 1) / tilemap.screenFactor.x) {
 			player.position.x = (tilemap.width - 1) / tilemap.screenFactor.x;
 		}
 	}
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
+		player.direction.y = -1.0f;
 		player.position.y -= playerSpeed * delta;
 		if (playerTilePos.y < 0.0f) {
 			player.position.y = 0.0f;
 		}
 	}
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
+		player.direction.y = 1.0f;
 		player.position.y += playerSpeed * delta;
 		if (player.position.y > (tilemap.height - 1) / tilemap.screenFactor.y) {
 			// @todo
