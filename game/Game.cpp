@@ -64,7 +64,7 @@ void Game::Game::spawnMonsters(uint32_t count)
 	}
 }
 
-void Game::Game::spawnProjectile(Entities::Source source, uint32_t imageIndex, glm::vec2 position, glm::vec2 direction, float speed)
+void Game::Game::spawnProjectile(Entities::Source source, uint32_t imageIndex, glm::vec2 position, glm::vec2 direction, float speed, Entities::ProjectileType type, std::optional<Entities::Entity> target)
 {
 	// @todo: grow in chunks
 	// @todo: Add projectile types with properties like speed, movement pattern, damage, source, tc.
@@ -75,9 +75,14 @@ void Game::Game::spawnProjectile(Entities::Source source, uint32_t imageIndex, g
 	projectile.source = source;
 	projectile.damage = 25.0f;
 	projectile.life = 100.0f;
+	if (type == Entities::ProjectileType::Homing) {
+		projectile.life = 1000.0f;
+	}
 	projectile.speed = speed;
 	projectile.scale = 0.5f;
 	projectile.state = Entities::State::Alive;
+	projectile.type = type;
+	projectile.target = target;
 	// Replace dead projectiles first
 	for (auto& proj : projectiles) {
 		if (proj.state == Entities::State::Dead) {
@@ -124,41 +129,59 @@ void Game::Game::spawnNumber(uint32_t value, glm::vec2 position, Entities::Effec
 
 void Game::Game::playerWeaponTrigger()
 {
-	const uint32_t weaponType{ 2 };
-	// @todo: Multiple weapons, each with their own cooldown
-	// @todo: Idea: Just drop in place of player (e.g. a bomb)
-	// @todo: Idea: Rotating patterns (e.g. cross and then rotate that slowly)
-	switch (weaponType) {
-	case 0:
-	{
-		// Single bullet in a random direction
-		std::uniform_real_distribution<float> dirDist(-1.0f, 1.0f);
-		spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, glm::vec2(dirDist(randomEngine), dirDist(randomEngine)));
-		break;
-	}
-	case 1:
-	{
-		// Single bullet in player direction
-		if (player.direction.length() != 0.0f) {
-			spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, player.direction);
+	bool playSound{ false };
+	for (auto& weapon : player.weapons) {
+		// @todo: Multiple weapons, each with their own cooldown
+		// @todo: Idea: Just drop in place of player (e.g. a bomb)
+		// @todo: Idea: Rotating patterns (e.g. cross and then rotate that slowly)
+		if (weapon.type == WeaponType::Projectile) {
+			switch (weapon.variant) {
+			case 0:
+			{
+				// Single bullet in a random direction
+				std::uniform_real_distribution<float> dirDist(-1.0f, 1.0f);
+				spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, glm::vec2(dirDist(randomEngine), dirDist(randomEngine)));
+				playSound = true;
+				break;
+			}
+			case 1:
+			{
+				// Single bullet in player direction
+				if (player.direction.length() != 0.0f) {
+					spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, player.direction);
+					playSound = true;
+				}
+				break;
+			}
+			case 2:
+			{
+				// Circular pattern
+				playerFireTimerDuration = 15.0f;
+				const uint32_t count{ 16 };
+				const float dist{ 360.0f / (float)count };
+				for (auto i = 0; i < count; i++) {
+					const float angle{ (float)i * dist };
+					const glm::vec2 direction = normalize(glm::vec2(sin(angle * M_PI / 180.0f), cos(angle * M_PI / 180.0f)));
+					spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, direction, 10.0f);
+				}
+				playSound = true;
+				break;
+			}
+			}
 		}
-		break;
-	}
-	case 2:
-	{
-		// Circular pattern
-		playerFireTimerDuration = 15.0f;
-		const uint32_t count{ 16 };
-		const float dist{ 360.0f / (float)count };
-		for (auto i = 0; i < count; i++) {
-			const float angle{ (float)i * dist };
-			const glm::vec2 direction = normalize(glm::vec2(sin(angle * M_PI / 180.0f), cos(angle * M_PI / 180.0f)));
-			spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, direction, 10.0f);
+		if (weapon.type == WeaponType::ProjectileHoming) {
+			playerFireTimerDuration = 20.0f;
+			auto closestEnemy = findClosestEnemy();
+			if (closestEnemy.has_value()) {
+				spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, glm::vec2(0.0f), 4.0f, Entities::ProjectileType::Homing, closestEnemy);
+				playSound = true;
+			}
+			// @todo
 		}
-		break;
 	}
+	if (playSound) {
+		audioManager->playSnd("laser");
 	}
-	audioManager->playSnd("laser");
 }
 
 void Game::Game::monsterProjectileCollisionCheck(Entities::Monster& monster)
@@ -434,6 +457,21 @@ void Game::Game::updateInput(float delta)
 			player.position.y = (tilemap.height - 1) / tilemap.screenFactor.y;
 		}
 	}
+std::optional<Game::Entities::Monster> Game::Game::findClosestEnemy()
+{
+	std::optional<Entities::Monster> result = std::nullopt;
+	float distance = std::numeric_limits<float>::max();
+	for (auto& monster : monsters) {
+		if (monster.state == Entities::State::Dead) {
+			continue;
+		}
+		if (glm::distance(player.position, monster.position) < distance) {
+			distance = glm::distance(player.position, monster.position);
+			result = monster;
+		}
+	}
+	return result;
+}
 }
 
 int32_t Game::Game::getNextLevelExp(int32_t level)

@@ -728,12 +728,19 @@ public:
 		generateQuad();
 		createTileMap();
 
-		game.player.speed = 5.0f;
-		game.player.scale = 1.0f;
-		game.player.position = glm::vec2(-(float)game.tilemap.width / 2.0f, -(float)game.tilemap.height / 2.0f);
+		// Init player
+		auto& player = game.player;
+		player.speed = 5.0f;
+		player.scale = 1.0f;
+		player.position = glm::vec2((float)game.tilemap.width / 2.0f, (float)game.tilemap.height / 2.0f);
 		// @todo
-		//game.player.position = glm::vec2((float)tileMap.width - 64.0f, (float)tileMap.height - 64.0f);
-		game.player.position = glm::vec2(0.0f);
+		//game.player.position = glm::vec2(0.0f);
+		// @todo: Proper weapon setup/selection
+		player.weapons.resize(1);
+		player.weapons[0] = {
+			.type = Game::WeaponType::Projectile,
+			.variant = 2,
+		};
 
 		// @todo: for benchmarking, this is > 60 fps on my setup
 		//spawnMonsters(1150000);
