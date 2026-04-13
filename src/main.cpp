@@ -102,6 +102,10 @@ private:
 		Buffer* lightsBuffer{ nullptr };
 		DescriptorSet* descriptorSetLights{ nullptr };
 
+		Buffer* uiBuffer{ nullptr };
+		uint32_t uiBufferSize{ 0 };
+		uint32_t uiBufferVertexCount{ 0 };
+
 		// @todo: Separate projectiles into own set of instance buffers (due to different update frequency?)
 		//struct Projectiles {
 		//	Buffer* instanceBuffer{ nullptr };
@@ -180,6 +184,7 @@ public:
 			delete frame.uniformBuffer;
 			delete frame.instanceBuffer;
 			delete frame.lightsBuffer;
+			delete frame.uiBuffer;
 			delete[] frame.instances;
 		}
 		delete stagingBuffer;
@@ -294,6 +299,8 @@ public:
 		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/water.png", game.tilemap.lastTileIndex);
 		loadTexture(getAssetPath() + "game/crtframe.png", crtFrameImageIndex);
 
+		// Game UI
+		loadTexture(getAssetPath() + "game/ui.png", game.uiImageIndex);
 		SamplerCreateInfo samplerCI {
 			.name = "Sprite sampler",
 			.magFilter = VK_FILTER_NEAREST,
@@ -710,6 +717,60 @@ public:
 		}
 	}
 
+	void updateUIBuffer(FrameObjects& frame) {
+		std::vector<Vertex> v{};
+
+		// @todo: reserve instead of push_back
+		auto addElement = [&v](glm::vec4 r, glm::vec4 uv, float z = 0.0f) {
+			// x:top y:left, z:bottom w:right
+			v.push_back({ { r.w - 1.0f, r.z - 1.0f, z }, { uv.w, uv.z } });
+			v.push_back({ { r.y - 1.0f, r.z - 1.0f, z }, { uv.y, uv.z } });
+			v.push_back({ { r.y - 1.0f, r.x - 1.0f, z }, { uv.y, uv.x } });
+			v.push_back({ { r.y - 1.0f, r.x - 1.0f, z }, { uv.y, uv.x } });
+			v.push_back({ { r.w - 1.0f, r.x - 1.0f, z }, { uv.w, uv.x } });
+			v.push_back({ { r.w - 1.0f, r.z - 1.0f, z }, { uv.w, uv.z } });
+		};
+
+		auto t = 1.0f / 4.0f;
+		auto h = 0.025f;
+		glm::vec2 o = { 0.05f, 0.05f };
+
+		addElement({ o.y + 0.0f, o.x + 0.0f, o.y + h, o.x + 0.25f }, { 0.0f, 0.0f, t, 1.0f });
+		addElement({ o.y + 0.0f, o.x + 0.0f, o.y + h, o.x + 0.25f * game.player.health / game.player.maxHealth }, { t, 0.0f, t + t, 1.0f });
+
+		o.y += h * 2.0f;
+		
+		addElement({ o.y + 0.0f, o.x + 0.0f, o.y + h, o.x + 0.25f }, { 0.0f, 0.0f, t, 1.0f });
+		addElement({ o.y + 0.0f, o.x + 0.0f, o.y + h, o.x + 0.25f * game.player.stamina / game.player.maxStamina }, { t * 3, 0.0f, t * 3 + t , 1.0f });
+
+		o.y += h * 2.0f;
+
+		addElement({ o.y + 0.0f, o.x + 0.0f, o.y + h, o.x + 0.25f }, { 0.0f, 0.0f, t, 1.0f });
+		addElement({ o.y + 0.0f, o.x + 0.0f, o.y + h, o.x + 0.25f * (game.player.experience - game.getNextLevelExp(game.player.level)) / game.getNextLevelExp(game.player.level + 1) }, { t * 2, 0.0f, t * 2 + t , 1.0f });
+
+		frame.uiBufferVertexCount = static_cast<uint32_t>(v.size());
+
+		const size_t vertexBufferSize = v.size() * sizeof(Vertex);
+
+		if (frame.uiBufferSize < vertexBufferSize) {
+			delete frame.uiBuffer;
+			frame.uiBuffer = new Buffer({
+				.usageFlags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				.size = vertexBufferSize,
+#if defined(USE_REBAR)
+				.vmaAllocFlags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT,
+				.map = true,
+#endif
+			});
+			frame.uiBufferSize = vertexBufferSize;
+		}
+#if defined(USE_REBAR)
+		memcpy(frame.uiBuffer->mapped, v.data(), vertexBufferSize);
+#else
+		// todo
+#endif
+	}
+
 	void prepare() {
 		VulkanApplication::prepare();
 
@@ -1000,6 +1061,70 @@ public:
 			.enableHotReload = true
 		});
 		pipelineList.push_back(pipelines["crtframe"]);
+		// In-Game UI (not ImGui debug UI)
+
+		vertexInput = {
+			.bindings = {
+				{.binding = 0, .stride = sizeof(Vertex), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX },
+			},
+			.attributes = {
+				{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, pos) },
+				{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vertex, uv) },
+			}
+		};
+
+		pipelineLayouts["gameui"] = new PipelineLayout({
+			.layouts = { descriptorSetLayoutTextures->handle, descriptorSetLayoutSamplers->handle, descriptorSetLayoutUniforms->handle },
+			.pushConstantRanges = {
+				{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = sizeof(uint32_t) }
+			}
+		});
+
+		pipelines["gameui"] = new Pipeline({
+			.shaders = {
+				.filename = getAssetPath() + "shaders/ui.slang",
+				.stages = { VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT }
+			},
+			.cache = pipelineCache,
+			.layout = *pipelineLayouts["gameui"],
+			.vertexInput = vertexInput,
+			.inputAssemblyState = {
+				.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+			},
+			.viewportState = {
+				.viewportCount = 1,
+				.scissorCount = 1
+			},
+			.rasterizationState = {
+				.polygonMode = VK_POLYGON_MODE_FILL,
+				.cullMode = VK_CULL_MODE_BACK_BIT,
+				.frontFace = VK_FRONT_FACE_CLOCKWISE,
+				.lineWidth = 1.0f
+			},
+			.multisampleState = {
+				.rasterizationSamples = settings.sampleCount,
+			},
+			.depthStencilState = {
+				.depthTestEnable = VK_FALSE,
+				.depthWriteEnable = VK_FALSE,
+				.depthCompareOp = VK_COMPARE_OP_ALWAYS,
+			},
+			.blending = {
+				.attachments = { blendAttachmentState }
+			},
+			.dynamicState = {
+				DynamicState::Scissor,
+				DynamicState::Viewport
+			},
+			.pipelineRenderingInfo = {
+				.colorAttachmentCount = 1,
+				.pColorAttachmentFormats = &swapChain->colorFormat,
+				.depthAttachmentFormat = depthFormat,
+				.stencilAttachmentFormat = depthFormat
+			},
+			.enableHotReload = true
+		});
+		pipelineList.push_back(pipelines["gameui"]);
 		// Post process
 		descriptorSetLayoutRenderImage = new DescriptorSetLayout({
 			.descriptorIndexing = true,
@@ -1225,6 +1350,13 @@ public:
 		cb->bindDescriptorSets(pipelineLayouts["sprite"], { descriptorSetTextures, descriptorSetSamplers, frame.descriptorSet });
 		cb->bindPipeline(pipelines["sprite"]);
 		cb->draw(6, frame.instanceBufferDrawCount, 0, 0);		
+		// Game overlay
+		// @todo: before or after post process?
+		cb->bindVertexBuffers(0, 1, { frame.uiBuffer->buffer });
+		cb->bindDescriptorSets(pipelineLayouts["gameui"], { descriptorSetTextures, descriptorSetSamplers, frame.descriptorSet });
+		cb->bindPipeline(pipelines["gameui"]);
+		cb->updatePushConstant(pipelineLayouts["gameui"], 0, &game.uiImageIndex);
+		cb->draw(frame.uiBufferVertexCount, 1, 0, 0);
 		cb->endRendering();
 
 		// Transition color image for presentation
@@ -1301,6 +1433,11 @@ public:
 			ZoneScopedN("Lights buffer update");
 			updateLightsBuffer(currentFrame);
 		}
+		{
+			ZoneScopedN("UI buffer update");
+			updateUIBuffer(currentFrame);
+		}
+
 
 		updatePostProcessEffect(frameTimer);
 
