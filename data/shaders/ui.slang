@@ -27,5 +27,7 @@ VSOutput main(VSInput input, uint VertexIndex: SV_VertexID)
 [shader("fragment")]
 float4 main(VSOutput input, uniform uint textureIndex)
 {
-    return textures[textureIndex].Sample(samplers[0], input.UV);
+    float4 color = textures[textureIndex].Sample(samplers[0], input.UV);
+    color.a = 0.0f;
+    return color;
 }

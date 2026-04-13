@@ -82,17 +82,22 @@ float4 main(VSOutput input, uniform int effect)
     // CRT curvature
     float2 uv = curveRemapUV(input.UV);
 
-    float3 texSample = inputImage.Sample(uv).rgb;
-    float3 color = texSample.rgb * ubo.dayNightCycle;
+    float4 texSample = inputImage.Sample(uv);
+    float3 color;
+    if (texSample.a == 0.0f) {
+        color = texSample.rgb;
+    } else {
+        color = texSample.rgb * ubo.dayNightCycle;
 
-    // Add light colors together
-    for (uint32_t i = 0; i < ubo.lightCount; i++) {
-        float2 l = uv - lights[i].pos;
-        l.x *= ubo.viewportAR;
-        float atten = min(length(l), lights[i].radius) / lights[i].radius;
-        atten = pow(atten, 0.5);
-        atten = 1.0f - atten;
-        color += lights[i].color * texSample.rgb * atten;
+        // Add light colors together
+        for (uint32_t i = 0; i < ubo.lightCount; i++) {
+            float2 l = uv - lights[i].pos;
+            l.x *= ubo.viewportAR;
+            float atten = min(length(l), lights[i].radius) / lights[i].radius;
+            atten = pow(atten, 0.5);
+            atten = 1.0f - atten;
+            color += lights[i].color * texSample.rgb * atten;
+        }
     }
 
     //color = texSample.rgb;
