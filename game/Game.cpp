@@ -19,6 +19,42 @@ Game::Game::Game()
 {
 	randomEngine.seed((unsigned)time(nullptr));
 	threadPool.setThreadCount(std::thread::hardware_concurrency());
+	// @todo: load from config file
+	weaponTypes =
+	{
+		{
+			.name = "Random direction single bullet",
+			.type = WeaponType::Projectile,
+			.variant = 0,
+			.speed = 15.0f,
+			.damage = 25.0f,
+			.cooldown = 10.0f
+		},
+		{
+			.name = "Player direction single bullet",
+			.type = WeaponType::Projectile,
+			.variant = 1,
+			.speed = 10.0f,
+			.damage = 25.0f,
+			.cooldown = 10.0f
+		},
+		{
+			.name = "Circular bullet pattern",
+			.type = WeaponType::Projectile,
+			.variant = 2,
+			.speed = 15.0f,
+			.damage = 15.0f,
+			.cooldown = 15.0f
+		},
+		{
+			.name = "Homing (nearest) single bullet",
+			.type = WeaponType::ProjectileHoming,
+			.variant = 0,
+			.speed = 45.0f,
+			.damage = 20.0f,
+			.cooldown = 5.0f
+		}
+	};
 }
 
 void Game::Game::spawnMonsters(uint32_t count)
