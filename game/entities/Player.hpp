@@ -23,6 +23,7 @@ namespace Game {
 			float maxStamina{ 2.5f };
 			float pickupDistance{ 3.0f };
 			void addExperience(float value);
+			virtual void update(float delta) override;
 		};
 	}
 }

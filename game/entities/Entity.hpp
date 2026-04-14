@@ -48,7 +48,7 @@ namespace Game {
 			float effectTimer{ 1.0f };
 			float invincibilityTimer{ 0.0f };
 			void setEffect(Effect effect);
-			void update(float delta);
+			virtual void update(float delta);
 		};
 	}
 }

@@ -5,3 +5,10 @@
 */
 
 #include "Weapon.hpp"
+
+void Game::Weapon::update(float delta)
+{
+	if (cooldownTimer < cooldown) {
+		cooldownTimer += 25.0f * delta;
+	}
+}

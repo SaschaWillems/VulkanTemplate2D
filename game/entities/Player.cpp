@@ -11,3 +11,11 @@ void Game::Entities::Player::addExperience(float value)
 	// @todo: proper levelling
 	experience += value;
 }
+
+void Game::Entities::Player::update(float delta)
+{
+	Entity::update(delta);
+	for (auto& weapon : weapons) {
+		weapon.update(delta);
+	}
+}

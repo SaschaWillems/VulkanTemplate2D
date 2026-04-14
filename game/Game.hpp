@@ -72,6 +72,7 @@ namespace Game {
 		void spawnMonsters(uint32_t count);
 		// @todo: use create info struct
 		void spawnProjectile(Entities::Source source, uint32_t imageIndex, glm::vec2 position, glm::vec2 direction, float speed = 15.0f, Entities::ProjectileType type = Entities::ProjectileType::Directional, std::optional<Entities::Entity> target = std::nullopt);
+		void spawnProjectile(Entities::Source source, uint32_t imageIndex, glm::vec2 position, glm::vec2 direction, Weapon weapon, std::optional<Entities::Entity> target = std::nullopt);
 		void spawnPickup(Entities::Pickup pickup);
 		void spawnNumber(uint32_t value, glm::vec2 position, Entities::Effect effect = Entities::Effect::None);
 

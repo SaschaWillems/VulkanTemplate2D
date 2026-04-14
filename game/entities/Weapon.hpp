@@ -7,6 +7,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <string>
 
 // @todo: enums for weapon types?
 
@@ -20,7 +21,13 @@ namespace Game {
 
 	class Weapon {
 	public:
+		std::string name;
 		WeaponType type{ WeaponType::Projectile };
 		uint32_t variant{ 0 };
+		float speed{ 15.0f };
+		float damage{ 25.0f };
+		float cooldownTimer{ 0.0f };
+		float cooldown{ 10.0f };
+		void update(float delta);
 	};
 }

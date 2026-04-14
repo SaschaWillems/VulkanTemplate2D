@@ -93,6 +93,42 @@ void Game::Game::spawnProjectile(Entities::Source source, uint32_t imageIndex, g
 	projectiles.push_back(projectile);
 }
 
+void Game::Game::spawnProjectile(Entities::Source source, uint32_t imageIndex, glm::vec2 position, glm::vec2 direction, Weapon weapon, std::optional<Entities::Entity> target)
+{
+	// @todo: grow in chunks
+	// @todo: Add projectile types with properties like speed, movement pattern, damage, source, tc.
+	Entities::Projectile projectile{};
+	projectile.position = position;
+	projectile.direction = direction;
+	projectile.imageIndex = imageIndex;
+	projectile.source = source;
+	projectile.damage = weapon.damage;
+	projectile.life = 100.0f;
+	if (weapon.type == WeaponType::ProjectileHoming) {
+		projectile.life = 1000.0f;
+	}
+	projectile.speed = weapon.speed;
+	projectile.scale = 0.5f;
+	projectile.state = Entities::State::Alive;
+	switch (weapon.type) {
+	case WeaponType::Projectile:
+		projectile.type = Entities::ProjectileType::Homing;
+		break;
+	case WeaponType::ProjectileHoming:
+		projectile.type = Entities::ProjectileType::Homing;
+		break;
+	}
+	projectile.target = target;
+	// Replace dead projectiles first
+	for (auto& proj : projectiles) {
+		if (proj.state == Entities::State::Dead) {
+			proj = projectile;
+			return;
+		}
+	}
+	projectiles.push_back(projectile);
+}
+
 void Game::Game::spawnPickup(Entities::Pickup pickup)
 {
 	// Replace dead pickups first
@@ -134,53 +170,56 @@ void Game::Game::playerWeaponTrigger()
 		// @todo: Multiple weapons, each with their own cooldown
 		// @todo: Idea: Just drop in place of player (e.g. a bomb)
 		// @todo: Idea: Rotating patterns (e.g. cross and then rotate that slowly)
-		if (weapon.type == WeaponType::Projectile) {
-			switch (weapon.variant) {
-			case 0:
-			{
-				// Single bullet in a random direction
-				std::uniform_real_distribution<float> dirDist(-1.0f, 1.0f);
-				spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, glm::vec2(dirDist(randomEngine), dirDist(randomEngine)));
-				playSound = true;
-				break;
+		// @todo: Move into dedicated fn so this can be reused
+		if (weapon.cooldownTimer >= weapon.cooldown) {
+			weapon.cooldownTimer = 0.0f;
+			if (weapon.type == WeaponType::Projectile) {
+				switch (weapon.variant) {
+				case 0:
+				{
+					// Single bullet in a random direction
+					std::uniform_real_distribution<float> dirDist(-1.0f, 1.0f);
+					spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, glm::vec2(dirDist(randomEngine), dirDist(randomEngine)), weapon);
+					playSound = true;
+					break;
+				}
+				case 1:
+				{
+					// Single bullet in player direction
+					if (glm::length(player.direction) != 0.0f) {
+						spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, player.direction, weapon);
+						playSound = true;
+					}
+					break;
+				}
+				case 2:
+				{
+					// Circular pattern
+					const uint32_t count{ 16 };
+					const float dist{ 360.0f / (float)count };
+					for (auto i = 0; i < count; i++) {
+						const float angle{ (float)i * dist };
+						const glm::vec2 direction = normalize(glm::vec2(sin(angle * M_PI / 180.0f), cos(angle * M_PI / 180.0f)));
+						spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, direction, weapon);
+					}
+					playSound = true;
+					break;
+				}
+				}
 			}
-			case 1:
-			{
-				// Single bullet in player direction
-				if (glm::length(player.direction) != 0.0f) {
-					spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, player.direction);
+			if (weapon.type == WeaponType::ProjectileHoming) {
+				auto closestEnemy = findClosestEnemy();
+				if (closestEnemy.has_value()) {
+					spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, glm::vec2(0.0f), weapon, closestEnemy);
 					playSound = true;
 				}
-				break;
+				// @todo
 			}
-			case 2:
-			{
-				// Circular pattern
-				playerFireTimerDuration = 15.0f;
-				const uint32_t count{ 16 };
-				const float dist{ 360.0f / (float)count };
-				for (auto i = 0; i < count; i++) {
-					const float angle{ (float)i * dist };
-					const glm::vec2 direction = normalize(glm::vec2(sin(angle * M_PI / 180.0f), cos(angle * M_PI / 180.0f)));
-					spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, direction, 10.0f);
-				}
-				playSound = true;
-				break;
-			}
-			}
-		}
-		if (weapon.type == WeaponType::ProjectileHoming) {
-			playerFireTimerDuration = 20.0f;
-			auto closestEnemy = findClosestEnemy();
-			if (closestEnemy.has_value()) {
-				spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, glm::vec2(0.0f), 4.0f, Entities::ProjectileType::Homing, closestEnemy);
-				playSound = true;
-			}
-			// @todo
 		}
 	}
 	if (playSound) {
-		audioManager->playSnd("laser");
+		// @todo
+		// audioManager->playSnd("laser");
 	}
 }
 
@@ -256,11 +295,9 @@ void Game::Game::update(float delta)
 	currentRun.update(delta);
 
 	// Player projectiles
-	playerFireTimer += delta * 25.0f;
-	if (playerFireTimer > playerFireTimerDuration) {
-		playerFireTimer = 0.0f;
-		playerWeaponTrigger();
-	}
+	// @todo: move elsewhere and implement different patterns
+	// @todo: invert (-=)
+	playerWeaponTrigger();
 
 	/*
 	{
