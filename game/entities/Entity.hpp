@@ -1,5 +1,5 @@
 /*
-* Copyright(C) 2024 by Sascha Willems - www.saschawillems.de
+* Copyright(C) 2024-2026 by Sascha Willems - www.saschawillems.de
 *
 * This code is licensed under the MIT license(MIT) (http://opensource.org/licenses/MIT)
 */
@@ -46,6 +46,7 @@ namespace Game {
 			// @todo
 			Effect effect{ Effect::None };
 			float effectTimer{ 1.0f };
+			float invincibilityTimer{ 0.0f };
 			void setEffect(Effect effect);
 			void update(float delta);
 		};

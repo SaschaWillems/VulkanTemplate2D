@@ -315,6 +315,8 @@ void Game::Game::update(float delta)
 	{
 		ZoneScopedN("Entity updates");
 
+		player.update(delta);
+
 		threadPool.threads[0]->addJob([=] {
 			for (auto& pickup : pickups) {
 				if (pickup.state == Entities::State::Dead) {
@@ -405,6 +407,17 @@ void Game::Game::update(float delta)
 						}
 					}
 					monsterProjectileCollisionCheck(monster);
+					// @todo: thread saftey
+					if (monster.state != Entities::State::Dead) {
+						if (glm::distance(player.position, monster.position) < monster.scale) {
+							// @todo: put into function
+							if (player.invincibilityTimer <= 0.0f) {
+								// @todo: damage from monster
+								player.health -= 1.0f;
+								player.invincibilityTimer = 1.0f;
+							}
+						}
+					}
 				}
 			});
 		}

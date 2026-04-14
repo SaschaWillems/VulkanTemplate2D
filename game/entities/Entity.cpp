@@ -1,5 +1,5 @@
 /*
-* Copyright(C) 2024 by Sascha Willems - www.saschawillems.de
+* Copyright(C) 2024-2026 by Sascha Willems - www.saschawillems.de
 *
 * This code is licensed under the MIT license(MIT) (http://opensource.org/licenses/MIT)
 */
@@ -22,5 +22,9 @@ void Game::Entities::Entity::update(float delta)
 		if (effectTimer <= 0.0f) {
 			effect = Effect::None;
 		}
+	}
+	if (invincibilityTimer > 0.0f) {
+		// @todo
+		invincibilityTimer -= delta * 2.5f;
 	}
 }
