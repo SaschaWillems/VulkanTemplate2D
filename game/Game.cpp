@@ -390,17 +390,19 @@ void Game::Game::update(float delta)
 						continue;
 					}
 					// @todo: simple "logic" for testing
-					// @todo: Use velocity
-					// Monsters far away respawn outside of the view
 					monster.update(delta);
+					// Monsters far away respawn outside of the view
 					if (glm::length(player.position - monster.position) > playFieldSize.x * 3.0f) {
 						monsterSpawnPosition(monster);
 					};
 					monster.direction = glm::normalize(player.position - monster.position);
-					monster.position += monster.direction * monster.speed * delta;
-					if (glm::length(monster.velocity) > 0.1f) {
-						monster.position += monster.velocity * delta * 100.0f;
-						monster.velocity *= 0.01f * delta;
+					monster.velocity += monster.direction * monster.speed * 0.01f;
+					if (glm::length(monster.direction) > 0.0f) {
+						//monster.position += monster.direction * monster.speed * delta;
+						if (glm::length(monster.velocity) > 0.1f) {
+							monster.position += monster.velocity * delta * 100.0f;
+							monster.velocity *= 0.01f * delta;
+						}
 					}
 					monsterProjectileCollisionCheck(monster);
 				}
