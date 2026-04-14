@@ -76,6 +76,8 @@ namespace Game {
 		void spawnPickup(Entities::Pickup pickup);
 		void spawnNumber(uint32_t value, glm::vec2 position, Entities::Effect effect = Entities::Effect::None);
 
+		void weaponTrigger(Entities::Entity& source, Weapon& weapon);
+		void monsterWeaponTrigger(Entities::Monster& monster);
 		void playerWeaponTrigger();
 
 		void monsterProjectileCollisionCheck(Entities::Monster& monster);

@@ -199,63 +199,87 @@ void Game::Game::spawnNumber(uint32_t value, glm::vec2 position, Entities::Effec
 	numbers.push_back(number);
 }
 
-void Game::Game::playerWeaponTrigger()
+void Game::Game::weaponTrigger(Entities::Entity& source, Weapon& weapon)
 {
-	bool playSound{ false };
-	for (auto& weapon : player.weapons) {
-		// @todo: Multiple weapons, each with their own cooldown
-		// @todo: Idea: Just drop in place of player (e.g. a bomb)
-		// @todo: Idea: Rotating patterns (e.g. cross and then rotate that slowly)
-		// @todo: Move into dedicated fn so this can be reused
-		if (weapon.cooldownTimer >= weapon.cooldown) {
-			weapon.cooldownTimer = 0.0f;
-			if (weapon.type == WeaponType::Projectile) {
-				switch (weapon.variant) {
-				case 0:
-				{
-					// Single bullet in a random direction
-					std::uniform_real_distribution<float> dirDist(-1.0f, 1.0f);
-					spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, glm::vec2(dirDist(randomEngine), dirDist(randomEngine)), weapon);
-					playSound = true;
-					break;
-				}
-				case 1:
-				{
-					// Single bullet in player direction
-					if (glm::length(player.direction) != 0.0f) {
-						spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, player.direction, weapon);
-						playSound = true;
-					}
-					break;
-				}
-				case 2:
-				{
-					// Circular pattern
-					const uint32_t count{ 16 };
-					const float dist{ 360.0f / (float)count };
-					for (auto i = 0; i < count; i++) {
-						const float angle{ (float)i * dist };
-						const glm::vec2 direction = normalize(glm::vec2(sin(angle * M_PI / 180.0f), cos(angle * M_PI / 180.0f)));
-						spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, direction, weapon);
-					}
-					playSound = true;
-					break;
-				}
-				}
+	Entities::Source sourceType = Entities::Source::Player;
+	if (dynamic_cast<Entities::Monster*>(&source)) {
+		sourceType = Entities::Source::Monster;
+	}
+	bool playSound = false;
+	if (weapon.cooldownTimer >= weapon.cooldown) {
+		weapon.cooldownTimer = 0.0f;
+		if (weapon.type == WeaponType::Projectile) {
+			switch (weapon.variant) {
+			case 0:
+			{
+				// Single bullet in a random direction
+				std::uniform_real_distribution<float> dirDist(-1.0f, 1.0f);
+				spawnProjectile(sourceType, projectileImageIndex, player.position, glm::vec2(dirDist(randomEngine), dirDist(randomEngine)), weapon);
+				playSound = true;
+				break;
 			}
-			if (weapon.type == WeaponType::ProjectileHoming) {
-				auto closestEnemy = findClosestEnemy();
-				if (closestEnemy.has_value()) {
-					spawnProjectile(Entities::Source::Player, projectileImageIndex, player.position, glm::vec2(0.0f), weapon, closestEnemy);
+			case 1:
+			{
+				// Single bullet in player direction
+				if (glm::length(player.direction) != 0.0f) {
+					spawnProjectile(sourceType, projectileImageIndex, player.position, player.direction, weapon);
 					playSound = true;
 				}
-				// @todo
+				break;
 			}
+			case 2:
+			{
+				// Circular pattern
+				const uint32_t count{ 16 };
+				const float dist{ 360.0f / (float)count };
+				for (auto i = 0; i < count; i++) {
+					const float angle{ (float)i * dist };
+					const glm::vec2 direction = normalize(glm::vec2(sin(angle * M_PI / 180.0f), cos(angle * M_PI / 180.0f)));
+					spawnProjectile(sourceType, projectileImageIndex, player.position, direction, weapon);
+				}
+				playSound = true;
+				break;
+			}
+			}
+		}
+		if (weapon.type == WeaponType::ProjectileHoming) {
+			std::optional<Entities::Entity> target = std::nullopt;;
+			if (sourceType == Entities::Source::Player) {
+				target = findClosestEnemy();
+			};
+			if (sourceType == Entities::Source::Monster) {
+				target = player;
+			}
+			if (target.has_value()) {
+				spawnProjectile(sourceType, projectileImageIndex, player.position, glm::vec2(0.0f), weapon, target);
+				playSound = true;
+			}
+			// @todo
 		}
 	}
 	if (playSound) {
 		// @todo
 		// audioManager->playSnd("laser");
+	}
+}
+
+// @todo: rework
+void Game::Game::monsterWeaponTrigger(Entities::Monster& monster)
+{
+	for (auto& weapon : monster.weapons) {
+		// @todo: Monsters should use different weapons (than player), usually less powerfull
+		weaponTrigger(player, weapon);
+	}
+}
+
+// @todo: rework
+void Game::Game::playerWeaponTrigger()
+{
+	for (auto& weapon : player.weapons) {
+		// @todo: Multiple weapons, each with their own cooldown
+		// @todo: Idea: Just drop in place of player (e.g. a bomb)
+		// @todo: Idea: Rotating patterns (e.g. cross and then rotate that slowly)
+		weaponTrigger(player, weapon);
 	}
 }
 
@@ -423,7 +447,7 @@ void Game::Game::update(float delta)
 			for (auto i = 0; i < projectiles.size(); i++) {
 				Entities::Projectile& projectile = projectiles[i];
 				// @todo: update function
-				if (projectile.type == Entities::ProjectileType::Homing) {
+				if (projectile.type == Entities::ProjectileType::Homing && projectile.target.has_value()) {
 					// @todo: what to do if target has died?
 					projectile.direction = glm::normalize(projectile.target.value().position - projectile.position);
 				}
@@ -497,6 +521,16 @@ void Game::Game::update(float delta)
 
 		threadPool.wait();
 	}
+
+	// Monster projectiles
+	// @todo: thread?
+	for (auto& monster : monsters) {
+		if ((monster.state == Entities::State::Dead) || (monster.weapons.empty())) {
+			continue;
+		}
+		monsterWeaponTrigger(monster);
+	}
+
 
 	// Monster spawn
 	spawnTriggerTimer += delta * 25.0f;
