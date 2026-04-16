@@ -20,7 +20,7 @@ Game::Game::Game()
 	randomEngine.seed((unsigned)time(nullptr));
 	threadPool.setThreadCount(std::thread::hardware_concurrency());
 	// @todo: load from config file
-	weaponTypes =
+	playerWeaponTypes =
 	{
 		{
 			.name = "Random direction single bullet",
@@ -54,6 +54,34 @@ Game::Game::Game()
 			.damage = 20.0f,
 			.cooldown = 5.0f
 		}
+	};
+
+	monsterWeaponTypes =
+	{
+		{
+			.name = "Random direction single bullet",
+			.type = WeaponType::Projectile,
+			.variant = 0,
+			.speed = 10.0f,
+			.damage = 10.0f,
+			.cooldown = 15.0f
+		},
+		{
+			.name = "Direction single bullet",
+			.type = WeaponType::Projectile,
+			.variant = 1,
+			.speed = 10.0f,
+			.damage = 15.0f,
+			.cooldown = 15.0f
+		},
+		{
+			.name = "Circular bullet pattern",
+			.type = WeaponType::Projectile,
+			.variant = 2,
+			.speed = 5.0f,
+			.damage = 5.0f,
+			.cooldown = 25.0f
+		},
 	};
 }
 
@@ -228,9 +256,9 @@ void Game::Game::weaponTrigger(Entities::Entity& source, Weapon& weapon)
 			}
 			case 1:
 			{
-				// Single bullet in player direction
-				if (glm::length(player.direction) != 0.0f) {
-					spawnProjectile(sourceType, projectileImageIndex, source.position, source.direction, weapon);
+				// Single bullet in entity direction
+				if (glm::length(source.direction) != 0.0f) {
+					spawnProjectile(sourceType, imageIndex, source.position, source.direction, weapon);
 					playSound = true;
 				}
 				break;
@@ -311,7 +339,7 @@ void Game::Game::monsterProjectileCollisionCheck(Entities::Monster& monster)
 					projectile.effect = Entities::Effect::Critical;
 				}
 				// @todo: Get from weapon for different effects (e.g. for damage types without a moving direction)
-				monster.velocity = projectile.direction * 10.0f;
+				monster.velocity += projectile.direction * 5.0f;
 				monster.health -= damage;
 				monster.setEffect(Entities::Effect::Hit);
 				spawnNumber(damage, monster.position, projectile.effect);

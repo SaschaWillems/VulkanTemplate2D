@@ -66,7 +66,8 @@ namespace Game {
 		float dayNightCycle{ 0.75f };
 
 		// @todo: load from config file
-		std::vector<Weapon> weaponTypes{};
+		std::vector<Weapon> playerWeaponTypes{};
+		std::vector<Weapon> monsterWeaponTypes{};
 
 		Run currentRun;
 

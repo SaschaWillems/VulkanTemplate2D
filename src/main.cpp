@@ -799,7 +799,7 @@ public:
 		//game.player.position = glm::vec2(0.0f);
 		// @todo: Proper weapon setup/selection
 		player.weapons.resize(1);
-		player.weapons[0] = game.weaponTypes[2];
+		player.weapons[0] = game.playerWeaponTypes[1];
 
 		// @todo: for benchmarking, this is > 60 fps on my setup
 		//spawnMonsters(1150000);
