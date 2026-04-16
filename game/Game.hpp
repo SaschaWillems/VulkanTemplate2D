@@ -84,6 +84,7 @@ namespace Game {
 		void playerWeaponTrigger();
 
 		void monsterProjectileCollisionCheck(Entities::Monster& monster);
+		void playerProjectileCollisionCheck();
 		void update(float delta);
 		void updateInput(float delta);
 

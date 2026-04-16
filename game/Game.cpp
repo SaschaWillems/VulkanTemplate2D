@@ -373,6 +373,47 @@ void Game::Game::monsterProjectileCollisionCheck(Entities::Monster& monster)
 	}
 }
 
+void Game::Game::playerProjectileCollisionCheck()
+{
+	std::uniform_real_distribution<float> critDist(0.0, 100.0f);
+	for (auto& projectile : projectiles) {
+		if (projectile.state == Entities::State::Dead) {
+			continue;
+		}
+		if (projectile.source == Entities::Source::Monster) {
+			// @todo: Proper collision check
+			if (abs(glm::distance(player.position, projectile.position)) < player.scale) {
+				// @todo: Projectiles that can hit multiple enemies before "dying"
+				projectile.state = Entities::State::Dead;
+				// @todo: Move logic to entity
+				float damage = projectile.damage;
+				// @todo: Move elsewhere
+				//if (critDist(randomEngine) <= player.criticalChance) {
+				//	damage *= player.criticalDamageMultiplier;
+				//	projectile.effect = Entities::Effect::Critical;
+				//}
+				// @todo: Get from weapon for different effects (e.g. for damage types without a moving direction)
+				//player.velocity += projectile.direction * 5.0f;
+				if (player.invincibilityTimer <= 0.0f) {
+					// @todo: damage from monster
+					player.health -= damage;
+					player.invincibilityTimer = 1.0f;
+				}
+				player.setEffect(Entities::Effect::Hit);
+				//spawnNumber(damage, monster.position, projectile.effect);
+				if (player.health <= 0.0f) {
+					// @todo
+				} else {
+					//audioManager->playSnd("enemyhit");
+				}
+			}
+			//if (projectile.state == Entities::State::Dead) {
+			//	break;
+			//}
+		}
+	}
+}
+
 void Game::Game::update(float delta)
 {
 	// @todo: totally work in progress
@@ -504,6 +545,10 @@ void Game::Game::update(float delta)
 					number.state = Entities::State::Dead;
 				}
 			}
+		});
+
+		threadPool.threads[2]->addJob([=] {
+			playerProjectileCollisionCheck();
 		});
 
 		// @todo: set min. no of monsters per thread for lower monster counts
