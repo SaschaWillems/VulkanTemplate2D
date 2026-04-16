@@ -155,6 +155,11 @@ void Game::Game::spawnProjectile(Entities::Source source, uint32_t imageIndex, g
 		break;
 	}
 	projectile.target = target;
+	// @todo: Get from weapon
+	projectile.lightColor = { 0.0f, 0.0f, 25.0f };
+	if (source == Entities::Source::Monster) {
+		projectile.lightColor = { 25.0f, 0.0f, 0.0f };
+	}
 	// Replace dead projectiles first
 	for (auto& proj : projectiles) {
 		if (proj.state == Entities::State::Dead) {

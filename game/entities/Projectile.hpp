@@ -25,6 +25,7 @@ namespace Game {
 			float damage;
 			// @todo: better name
 			float life;
+			glm::vec3 lightColor{};
 		};
 	}
 }

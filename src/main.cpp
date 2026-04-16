@@ -672,7 +672,7 @@ public:
 			lPos += 0.5;
 			frame.lights[lightIndex++] = {
 				.pos = lPos,
-				.color = glm::vec3(0.0f, 0.0f, 25.0f),
+				.color = projectile.lightColor,
 				.radius = 0.04f,
 			};
 		}
