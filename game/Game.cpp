@@ -201,9 +201,12 @@ void Game::Game::spawnNumber(uint32_t value, glm::vec2 position, Entities::Effec
 
 void Game::Game::weaponTrigger(Entities::Entity& source, Weapon& weapon)
 {
+	// @todo
+	uint32_t imageIndex = projectileImageIndex;
 	Entities::Source sourceType = Entities::Source::Player;
 	if (dynamic_cast<Entities::Monster*>(&source)) {
 		sourceType = Entities::Source::Monster;
+		imageIndex = projectileImageIndexMonster;
 	}
 	bool playSound = false;
 	if (weapon.cooldownTimer >= weapon.cooldown) {
@@ -214,7 +217,7 @@ void Game::Game::weaponTrigger(Entities::Entity& source, Weapon& weapon)
 			{
 				// Single bullet in a random direction
 				std::uniform_real_distribution<float> dirDist(-1.0f, 1.0f);
-				spawnProjectile(sourceType, projectileImageIndex, player.position, glm::vec2(dirDist(randomEngine), dirDist(randomEngine)), weapon);
+				spawnProjectile(sourceType, imageIndex, source.position, glm::vec2(dirDist(randomEngine), dirDist(randomEngine)), weapon);
 				playSound = true;
 				break;
 			}
@@ -222,7 +225,7 @@ void Game::Game::weaponTrigger(Entities::Entity& source, Weapon& weapon)
 			{
 				// Single bullet in player direction
 				if (glm::length(player.direction) != 0.0f) {
-					spawnProjectile(sourceType, projectileImageIndex, player.position, player.direction, weapon);
+					spawnProjectile(sourceType, projectileImageIndex, source.position, source.direction, weapon);
 					playSound = true;
 				}
 				break;
@@ -235,7 +238,7 @@ void Game::Game::weaponTrigger(Entities::Entity& source, Weapon& weapon)
 				for (auto i = 0; i < count; i++) {
 					const float angle{ (float)i * dist };
 					const glm::vec2 direction = normalize(glm::vec2(sin(angle * M_PI / 180.0f), cos(angle * M_PI / 180.0f)));
-					spawnProjectile(sourceType, projectileImageIndex, player.position, direction, weapon);
+					spawnProjectile(sourceType, imageIndex, source.position, direction, weapon);
 				}
 				playSound = true;
 				break;
@@ -251,7 +254,7 @@ void Game::Game::weaponTrigger(Entities::Entity& source, Weapon& weapon)
 				target = player;
 			}
 			if (target.has_value()) {
-				spawnProjectile(sourceType, projectileImageIndex, player.position, glm::vec2(0.0f), weapon, target);
+				spawnProjectile(sourceType, imageIndex, source.position, glm::vec2(0.0f), weapon, target);
 				playSound = true;
 			}
 			// @todo
@@ -268,7 +271,7 @@ void Game::Game::monsterWeaponTrigger(Entities::Monster& monster)
 {
 	for (auto& weapon : monster.weapons) {
 		// @todo: Monsters should use different weapons (than player), usually less powerfull
-		weaponTrigger(player, weapon);
+		weaponTrigger(monster, weapon);
 	}
 }
 

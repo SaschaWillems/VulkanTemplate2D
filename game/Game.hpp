@@ -58,13 +58,15 @@ namespace Game {
 
 		// @todo
 		uint32_t projectileImageIndex;
+		uint32_t projectileImageIndexMonster;
 		uint32_t experienceImageIndex;
 		uint32_t firstNumberImageIndex;
+		uint32_t uiImageIndex;
 
-		float playerFireTimer{ 0.0f };
-		float playerFireTimerDuration{ 5.0f };
+		float dayNightCycle{ 0.75f };
 
-		float dayNightCycle{ 0.0f };
+		// @todo: load from config file
+		std::vector<Weapon> weaponTypes{};
 
 		Run currentRun;
 

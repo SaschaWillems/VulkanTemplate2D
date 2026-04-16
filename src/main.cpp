@@ -287,6 +287,7 @@ public:
 
 		// @todo: Projectile images
 		loadTexture(getAssetPath() + "game/projectiles/magic_bolt_1.png", game.projectileImageIndex);
+		loadTexture(getAssetPath() + "game/projectiles/magic_bolt_4.png", game.projectileImageIndexMonster);
 		loadTexture(getAssetPath() + "game/pickups/misc_crystal_old.png", game.experienceImageIndex);
 
 		// @todo: tile map
