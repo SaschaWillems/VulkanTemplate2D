@@ -19,6 +19,7 @@ Game::Game::Game()
 {
 	randomEngine.seed((unsigned)time(nullptr));
 	threadPool.setThreadCount(std::thread::hardware_concurrency());
+
 	// @todo: load from config file
 	playerWeaponTypes =
 	{
@@ -42,6 +43,14 @@ Game::Game::Game()
 			.name = "Circular bullet pattern",
 			.type = WeaponType::Projectile,
 			.variant = 2,
+			.speed = 15.0f,
+			.damage = 15.0f,
+			.cooldown = 15.0f
+		},
+		{
+			.name = "Rotating bullet pattern",
+			.type = WeaponType::Projectile,
+			.variant = 3,
 			.speed = 15.0f,
 			.damage = 15.0f,
 			.cooldown = 15.0f
@@ -75,9 +84,9 @@ Game::Game::Game()
 			.cooldown = 15.0f
 		},
 		{
-			.name = "Circular bullet pattern",
+			.name = "Rotating circular bullet pattern",
 			.type = WeaponType::Projectile,
-			.variant = 2,
+			.variant = 3,
 			.speed = 5.0f,
 			.damage = 5.0f,
 			.cooldown = 25.0f
@@ -101,6 +110,9 @@ void Game::Game::spawnMonsters(uint32_t count)
 		const auto& monsterSet = monsterTypes.sets[rndMonsterSet(randomEngine)];
 		std::uniform_int_distribution<uint32_t> rndMonster(0, static_cast<uint32_t>(monsterSet.types.size() - 1));
 		const auto& monster = monsterSet.types[rndMonster(randomEngine)];
+		std::uniform_int_distribution<uint32_t> rndChance(0, 100);
+		// @todo: Separate weapon types for monsters
+		std::uniform_int_distribution<uint32_t> rndWeapon(0, static_cast<uint32_t>(monsterWeaponTypes.size() - 1));
 
 		Entities::Monster m;
 		monsterSpawnPosition(m);
@@ -109,13 +121,23 @@ void Game::Game::spawnMonsters(uint32_t count)
 		m.scale = scaleDist(randomEngine);
 
 		// Randomly spawn a huge boss
+		// @todo: limit no. of active bosses (more at later stages)
 		if (bossDist(randomEngine) >= 100 - spawnBossChance) {
 			m.isBoss = true;
 			// @todo: scale with level
 			m.health = 250.0f;
 			m.scale = scaleDist(randomEngine) * 2.5f;
+			// @todo: Randomly give weapon
+			if (rndChance(randomEngine) < 50) {
+				m.weapons = { monsterWeaponTypes[rndWeapon(randomEngine)] };
+			}
 		}
-		
+
+		// @todo: testing only
+		//if (rndChance(randomEngine) < 25) {
+		//	m.weapons = { monsterWeaponTypes[rndWeapon(randomEngine)] };
+		//}
+	
 		// Replace dead monsters first
 		for (auto& mon : monsters) {
 			if (mon.state == Entities::State::Dead) {
@@ -138,10 +160,7 @@ void Game::Game::spawnProjectile(Entities::Source source, uint32_t imageIndex, g
 	projectile.imageIndex = imageIndex;
 	projectile.source = source;
 	projectile.damage = 25.0f;
-	projectile.life = 100.0f;
-	if (type == Entities::ProjectileType::Homing) {
-		projectile.life = 1000.0f;
-	}
+	projectile.life = 1000.0f;
 	projectile.speed = speed;
 	projectile.scale = 0.5f;
 	projectile.state = Entities::State::Alive;
@@ -167,10 +186,7 @@ void Game::Game::spawnProjectile(Entities::Source source, uint32_t imageIndex, g
 	projectile.imageIndex = imageIndex;
 	projectile.source = source;
 	projectile.damage = weapon.damage;
-	projectile.life = 100.0f;
-	if (weapon.type == WeaponType::ProjectileHoming) {
-		projectile.life = 1000.0f;
-	}
+	projectile.life = 1000.0f;
 	projectile.speed = weapon.speed;
 	projectile.scale = 0.5f;
 	projectile.state = Entities::State::Alive;
@@ -276,6 +292,21 @@ void Game::Game::weaponTrigger(Entities::Entity& source, Weapon& weapon)
 				playSound = true;
 				break;
 			}
+			case 3:
+			{
+				// Rotating circular pattern (less bullets
+				const uint32_t count{ 8 };
+				const float dist{ 360.0f / (float)count };
+				std::uniform_real_distribution<float> rotDist(0.0f, 360.0f);
+				float rotOffset = rotDist(randomEngine);
+				for (auto i = 0; i < count; i++) {
+					const float angle{ (float)i * dist + rotOffset };
+					const glm::vec2 direction = normalize(glm::vec2(sin(angle * M_PI / 180.0f), cos(angle * M_PI / 180.0f)));
+					spawnProjectile(sourceType, imageIndex, source.position, direction, weapon);
+				}
+				playSound = true;
+				break;
+			}
 			}
 		}
 		if (weapon.type == WeaponType::ProjectileHoming) {
@@ -303,7 +334,9 @@ void Game::Game::weaponTrigger(Entities::Entity& source, Weapon& weapon)
 void Game::Game::monsterWeaponTrigger(Entities::Monster& monster)
 {
 	for (auto& weapon : monster.weapons) {
-		// @todo: Monsters should use different weapons (than player), usually less powerfull
+		if (!monster.visible) {
+			continue;
+		}
 		weaponTrigger(monster, weapon);
 	}
 }
@@ -429,6 +462,10 @@ void Game::Game::update(float delta)
 		dayNightCycle = dayNightCycle - 2.0f;
 	}
 
+	if (state == GameState::LevelUp) {
+		return;
+	}
+
 	currentRun.update(delta);
 
 	// Player projectiles
@@ -512,7 +549,7 @@ void Game::Game::update(float delta)
 							if (player.experience >= getNextLevelExp(player.level + 1)) {
 								player.level++;
 								// @todo: rethink
-								setState(GameState::LevelUp);
+								// setState(GameState::LevelUp);
 							}
 						}
 					}
@@ -552,9 +589,10 @@ void Game::Game::update(float delta)
 		});
 
 		// @todo: set min. no of monsters per thread for lower monster counts
-
+		// @todo: vectors are not thread safe, this is bound to randomly crash
 		const int32_t maxHardwareThreads = static_cast<int32_t>(std::thread::hardware_concurrency());
-		const auto maxMonsterThreads = std::max(maxHardwareThreads - 3, 1);
+		//const auto maxMonsterThreads = std::max(maxHardwareThreads - 3, 1);
+		auto maxMonsterThreads = 1;
 
 		const auto mtSize = monsters.size() / maxMonsterThreads;
 		for (auto t = 0; t < maxMonsterThreads; t++) {
@@ -567,6 +605,7 @@ void Game::Game::update(float delta)
 				for (auto i = start; i < end; i++) {
 					Entities::Monster& monster = monsters[i];
 					if (monster.state == Entities::State::Dead) {
+						monster.visible = false;
 						continue;
 					}
 					// @todo: simple "logic" for testing
@@ -575,6 +614,8 @@ void Game::Game::update(float delta)
 					if (glm::length(player.position - monster.position) > playFieldSize.x * 3.0f) {
 						monsterSpawnPosition(monster);
 					};
+					monster.visible = glm::length(player.position - monster.position) < std::max(playFieldSize.x, playFieldSize.y) * 1.5f;
+
 					monster.direction = glm::normalize(player.position - monster.position);
 					monster.velocity += monster.direction * monster.speed * 0.01f;
 					if (glm::length(monster.direction) > 0.0f) {
@@ -641,36 +682,48 @@ void Game::Game::updateInput(float delta)
 		}
 	}
 	player.direction = glm::vec2(.0f, .0f);
-	glm::vec2 playerTilePos = tilemap.tilePosFromVisualPos(player.position);
+	glm::ivec2 playerTilePos = tilemap.tilePosFromVisualPos(player.position);
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
 		player.direction.x = -1.0f;
-		player.position.x -= playerSpeed * delta;
-		if (playerTilePos.x < 0.0f) {
-			player.position.x = 0.0f;
-		}
 	}
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
 		player.direction.x = 1.0f;
-		player.position.x += playerSpeed * delta;
-		if (player.position.x > (tilemap.width - 1) / tilemap.screenFactor.x) {
-			player.position.x = (tilemap.width - 1) / tilemap.screenFactor.x;
-		}
 	}
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
 		player.direction.y = -1.0f;
-		player.position.y -= playerSpeed * delta;
-		if (playerTilePos.y < 0.0f) {
-			player.position.y = 0.0f;
-		}
 	}
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
 		player.direction.y = 1.0f;
-		player.position.y += playerSpeed * delta;
-		if (player.position.y > (tilemap.height - 1) / tilemap.screenFactor.y) {
-			// @todo
-			player.position.y = (tilemap.height - 1) / tilemap.screenFactor.y;
+	}
+	// @todo: proper collision check and use velocity
+	if (glm::length(player.direction) != 0.0f) {
+		glm::vec2 newPlayerPos = player.position + player.direction * playerSpeed * delta;
+		bool move = true;
+		// Bounds check
+		if (newPlayerPos.x < 0.0f || newPlayerPos.y < 0.0f) {
+			move = false;
+		}
+		if ((newPlayerPos.y > (tilemap.height - 1) / tilemap.screenFactor.y) || (newPlayerPos.x > (tilemap.width - 1) / tilemap.screenFactor.x)) {
+			move = false;
+		}
+		if (move) {
+			player.position = newPlayerPos;
 		}
 	}
+
+	if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space)) {
+		// Testing
+		for (auto& monster : monsters) {
+			if (monster.state == Entities::State::Dead) {
+				continue;
+			}
+			glm::vec2 dir = glm::normalize(monster.position - player.position);
+			monster.velocity += dir * 0.5f;
+		}
+	}
+
+}
+
 std::optional<Game::Entities::Monster> Game::Game::findClosestEnemy()
 {
 	std::optional<Entities::Monster> result = std::nullopt;
@@ -686,6 +739,16 @@ std::optional<Game::Entities::Monster> Game::Game::findClosestEnemy()
 	}
 	return result;
 }
+
+void Game::Game::setState(GameState newState)
+{
+	// @todo: transitions
+	state = newState;
+}
+
+Game::GameState Game::Game::getState() const
+{
+	return state;
 }
 
 int32_t Game::Game::getNextLevelExp(int32_t level)
