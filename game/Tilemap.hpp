@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025 by Sascha Willems - www.saschawillems.de
+ * Copyright (C) 2023-2026 by Sascha Willems - www.saschawillems.de
  *
  * This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
  */
@@ -12,19 +12,22 @@
 #include "DescriptorSet.hpp"
 #include <glm/glm.hpp>
 
+constexpr uint32_t TILEMAP_MAX_DIM = 64; // @todo: 2k or 4k
+
 namespace Game {
 	class Tilemap
 	{
 	public:
-		uint32_t* data{ nullptr };
+		// @todo: multiple layers? (background/foreground)
+		uint32_t data[TILEMAP_MAX_DIM][TILEMAP_MAX_DIM];
 		vks::Texture2D* texture{ nullptr };
 		Sampler* sampler{ nullptr };
 		DescriptorSet* descriptorSetSampler{ nullptr };
 		uint32_t imageIndex;
 		uint32_t firstTileIndex;
 		uint32_t lastTileIndex;
-		uint32_t width{ 0 };
-		uint32_t height{ 0 };
+		uint32_t width{ TILEMAP_MAX_DIM };
+		uint32_t height{ TILEMAP_MAX_DIM };
 		// Used to calculate actual tile index from visual screen position
 		glm::vec2 screenFactor{ 0.0f };
 		~Tilemap();

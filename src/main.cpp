@@ -61,11 +61,23 @@ struct Vertex {
 	float uv[2];
 };
 
+struct IV2 {
+	uint32_t x;
+	uint32_t y;
+};
+
 struct InstanceData {
 	glm::vec3 pos;
 	float scale{ 1.0f };
 	uint32_t imageIndex{ 0 };
 	uint32_t effect{ 0 };
+};
+
+struct TilemapInstanceData {
+	IV2 pos;
+	// @todo: smaller data type
+	uint32_t imageIndex{ 0 };
+	// uint32_t effect{ 0 };
 };
 
 struct LightSource {
@@ -106,6 +118,9 @@ private:
 		uint32_t uiBufferSize{ 0 };
 		uint32_t uiBufferVertexCount{ 0 };
 
+		// @todo: Tilemap rendering
+		uint32_t tilemapInstanceCount{ 0 };
+		Buffer* tilemapInstanceBuffer{ nullptr };
 		// @todo: Separate projectiles into own set of instance buffers (due to different update frequency?)
 		//struct Projectiles {
 		//	Buffer* instanceBuffer{ nullptr };
@@ -113,6 +128,7 @@ private:
 		//	uint32_t instanceBufferDrawCount{ 0 };
 		//} projectiles;
 	};
+	TilemapInstanceData* tilemapInstances{ nullptr };
 	// One large staging buffer that's reused for all copies
 	// @todo: per frame?
 	const size_t stagingBufferSize = 64 * 1024 * 1024;
@@ -186,6 +202,7 @@ public:
 			delete frame.lightsBuffer;
 			delete frame.uiBuffer;
 			delete[] frame.instances;
+			delete frame.tilemapInstanceBuffer;
 		}
 		delete stagingBuffer;
 		if (fileWatcher) {
@@ -334,66 +351,36 @@ public:
 			audioManager->addSoundFile(it.first, getAssetPath() + it.second);
 		}
 	}
+	
+	void initTileMap()
+	{
+		auto& tilemap = game.tilemap;
 
-	// @todo
-	// Tile map for the background is stored as a single one integer channel format, with each pixel storing a zero-based tile index
-	void createTileMap () {
-		game.tilemap.setSize(4096, 4096);
+		//game.tilemap.setSize(TILEMAP_MAX_DIM, TILEMAP_MAX_DIM);
 		game.tilemap.screenFactor = { 1.0f / (screenDim.x * 2.0f / (float)visibleTileCount), 1.0f / (screenDim.y * 2.0f / (float)visibleTileCount) };
 		shaderData.tilemapDim = { (float)game.tilemap.width, (float)game.tilemap.height };
-		const size_t texBufferSize = game.tilemap.width * game.tilemap.height * 4;
-		uint32_t* texBuffer = new uint32_t[texBufferSize];
-		memset(texBuffer, 0, texBufferSize);
-		
+		//const size_t texBufferSize = game.tilemap.width * game.tilemap.height * 4;
+		//uint32_t* texBuffer = new uint32_t[texBufferSize];
+		//memset(texBuffer, 0, texBufferSize);
+
 		// @todo: random tiles for testing
-		std::uniform_int_distribution<uint32_t> rndTile(0, static_cast<uint32_t>(0, game.tilemap.lastTileIndex - game.tilemap.firstTileIndex));
-		std::uniform_real_distribution<float> rndFDist(0.0f, 100.0f);
-		// @todo: generate border to see how tile map size works
-		uint32_t tileCounter{ 0 };
-		uint32_t tileType{ 0 }, nextTielType{ 0 };
-		uint32_t x{ 0 }, y{ 0 };
-		for (size_t i = 0; i < game.tilemap.width * game.tilemap.height; i++) {
-			tileType = 0;
-			if (tileCounter >= game.tilemap.width * 8) {
-//				tileType = rndTile(game.randomEngine);
-				tileCounter = 0;
-			}
-			//tileType = rndTile(game.randomEngine);
-			//if ((x == tileMap.width / 2) || (y  == tileMap.height / 2)) {
-			if (x == 0 || x == game.tilemap.width - 1 || y == 0 || y == game.tilemap.height - 1)
-			{
-				tileType = 3;
-			}
-			else if ((x % 64 == 0) || (y % 64 == 0)) {
-				tileType = 2;
-			}
-			// @todo: randomly fill areas between cross roads
-			//if (tileType == 0) {
-			//	tileType = rndTile(game.randomEngine);
-			//}
-			texBuffer[i] = tileType;
-			tileCounter++;
-			x++;
-			if (x >= game.tilemap.width) {
-				x = 0;
-				y++;
+		std::uniform_int_distribution<uint32_t> rndTile(0, static_cast<uint32_t>(0, 2));
+		for (auto x = 0; x < TILEMAP_MAX_DIM; x++) {
+			for (auto y = 0; y < TILEMAP_MAX_DIM; y++) {
+				// Border
+				if (y == 0 || y == TILEMAP_MAX_DIM - 1 || x == 0 || x == TILEMAP_MAX_DIM - 1) {
+					tilemap.data[x][y] = 3;
+					continue;
+				}
+				// @todo: testing
+				if (x % 16 == 0 && y % 16 == 0) {
+					tilemap.data[x][y] = 4;
+					continue;
+				}
+				tilemap.data[x][y] = rndTile(game.randomEngine);
 			}
 		}
 
-		vks::TextureFromBufferCreateInfo texCI = {
-			.buffer = texBuffer,
-			.bufferSize = texBufferSize,
-			.texWidth = game.tilemap.width,
-			.texHeight = game.tilemap.height,
-			.format = VK_FORMAT_R32_UINT,
-			.imageUsageFlags = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-			.createSampler = false,
-			.magFilter = VK_FILTER_NEAREST,
-			.minFilter = VK_FILTER_NEAREST
-		};
-		game.tilemap.texture = new vks::Texture2D(texCI);
-		textures.push_back(game.tilemap.texture);
-		game.tilemap.imageIndex = static_cast<uint32_t>(textures.size() - 1);
 	}
 
 	void updateTextureDescriptor() {
@@ -494,6 +481,50 @@ public:
 		delete cb;		
 		
 		delete stagingBuffer;
+	}
+
+	// @todo
+	// Tile map for the background is stored as a single one integer channel format, with each pixel storing a zero-based tile index
+	void updateTileMap(FrameObjects& frame) {
+		// @todo: only visible tiles
+
+		Game::Tilemap& tilemap = game.tilemap;
+
+		if (!tilemapInstances) {
+			tilemapInstances = new TilemapInstanceData[TILEMAP_MAX_DIM * TILEMAP_MAX_DIM];
+		}
+
+		if (!frame.tilemapInstanceBuffer) {
+			frame.tilemapInstanceBuffer = new Buffer({
+				.usageFlags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				.size = TILEMAP_MAX_DIM * TILEMAP_MAX_DIM * sizeof(TilemapInstanceData),
+				.vmaAllocFlags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT,
+				.map = true,
+			});
+		}
+
+		frame.tilemapInstanceCount = 0;
+		glm::ivec2 currentTilePos = glm::ivec2{ (int)(floor(game.player.position.x / 2.0f)), (int)(floor(game.player.position.y / 2.0f)) };
+		// @todo: calculate from screen dimension
+		int32_t sx = currentTilePos.x - 10;
+		int32_t ex = currentTilePos.x + 10;
+		int32_t sy = currentTilePos.y - 10;
+		int32_t ey = currentTilePos.y + 10;
+		for (int32_t y = sy; y <= ey; y++) {
+			for (int32_t x = sx; x <= ex; x++) {
+				if ((x < 0) || (y < 0) || (x > TILEMAP_MAX_DIM - 1) || (y > TILEMAP_MAX_DIM - 1)) {
+					continue;
+				}
+				tilemapInstances[frame.tilemapInstanceCount] = {
+					.pos = {.x = (uint32_t)x * 2, .y = (uint32_t)y * 2 },
+					.imageIndex = tilemap.data[x][y] + game.tilemap.firstTileIndex
+				};
+				frame.tilemapInstanceCount++;
+			}
+		}
+#if defined(USE_REBAR)
+		memcpy(frame.tilemapInstanceBuffer->mapped, &tilemapInstances[0], frame.tilemapInstanceCount * sizeof(TilemapInstanceData));
+#endif
 	}
 
 	void updateInstanceBuffer(FrameObjects& frame) {
@@ -994,6 +1025,74 @@ public:
 		});
 		pipelineList.push_back(pipelines["tilemap"]);
 
+		// Tilemap "naive" (easier to handle)
+		pipelineLayouts["tilemap-naive"] = new PipelineLayout({
+			.layouts = { descriptorSetLayoutTextures->handle, descriptorSetLayoutSamplers->handle, descriptorSetLayoutUniforms->handle },
+			// X, Y, Tileindex
+			.pushConstantRanges = {
+				{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = sizeof(uint32_t) * 3}
+			}
+		});
+
+		vertexInput = {
+			.bindings = {
+				{.binding = 0, .stride = sizeof(Vertex), .inputRate = VK_VERTEX_INPUT_RATE_VERTEX },
+				{.binding = 1, .stride = sizeof(TilemapInstanceData), .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE },
+			},
+			.attributes = {
+				{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, pos) },
+				{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vertex, uv) },
+				// Instanced
+				{.location = 2, .binding = 1, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(TilemapInstanceData, pos) },
+				{.location = 3, .binding = 1, .format = VK_FORMAT_R32_SINT, .offset = offsetof(TilemapInstanceData, imageIndex) },
+			}
+		};
+
+		pipelines["tilemap-naive"] = new Pipeline({
+			.shaders = {
+				.filename = getAssetPath() + "shaders/tilemap-naive.slang",
+				.stages = { VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT }
+			},
+			.cache = pipelineCache,
+			.layout = *pipelineLayouts["tilemap-naive"],
+			.vertexInput = vertexInput,
+			.inputAssemblyState = {
+				.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+			},
+			.viewportState = {
+				.viewportCount = 1,
+				.scissorCount = 1
+			},
+			.rasterizationState = {
+				.polygonMode = VK_POLYGON_MODE_FILL,
+				.cullMode = VK_CULL_MODE_BACK_BIT,
+				.frontFace = VK_FRONT_FACE_CLOCKWISE,
+				.lineWidth = 1.0f
+			},
+			.multisampleState = {
+				.rasterizationSamples = settings.sampleCount,
+			},
+			.depthStencilState = {
+				.depthTestEnable = VK_FALSE,
+				.depthWriteEnable = VK_FALSE,
+				.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+			},
+			.blending = {
+				.attachments = { blendAttachmentState }
+			},
+			.dynamicState = {
+				DynamicState::Scissor,
+				DynamicState::Viewport
+			},
+			.pipelineRenderingInfo = {
+				.colorAttachmentCount = 1,
+				.pColorAttachmentFormats = &swapChain->colorFormat,
+				.depthAttachmentFormat = depthFormat,
+				.stencilAttachmentFormat = depthFormat
+			},
+			.enableHotReload = true
+			});
+		pipelineList.push_back(pipelines["tilemap-naive"]);
 		// CRT frame
 		VkPipelineColorBlendAttachmentState blendAttachmentStateEnabled{
 			.blendEnable = VK_TRUE,
@@ -1335,10 +1434,20 @@ public:
 		pushConsts.floats[0] = 1024.0f / (float)visibleTileCount;
 		pushConsts.floats[1] = 1024.0f / (float)visibleTileCount;
 
+#ifdef TILEMAP_VAR_A
 		cb->bindDescriptorSets(pipelineLayouts["tilemap"], { descriptorSetTextures, game.tilemap.descriptorSetSampler, frame.descriptorSet });
 		cb->bindPipeline(pipelines["tilemap"]);
 		cb->updatePushConstant(pipelineLayouts["tilemap"], 0, &pushConsts);
 		cb->draw(3, 1, 0, 0);
+#else
+		// Tilemap variant B
+		// @todo: only display tiles actually visible (update similar to instance buffer for sprites)
+		cb->bindVertexBuffers(0, 1, { quadBuffer->buffer });
+		cb->bindVertexBuffers(1, 1, { frame.tilemapInstanceBuffer->buffer });
+		cb->bindDescriptorSets(pipelineLayouts["tilemap-naive"], { descriptorSetTextures, descriptorSetSamplers, frame.descriptorSet });
+		cb->bindPipeline(pipelines["tilemap-naive"]);
+		cb->draw(6, frame.tilemapInstanceCount, 0, 0);
+#endif
 
 		// Draw sprites using instancing
 		// Instancing buffer stores sprite index, position, scale, direction (to flip/rotate) uv, maybe color for health state
@@ -1426,6 +1535,10 @@ public:
 		{
 			ZoneScopedN("Instance buffer update");
 			updateInstanceBuffer(currentFrame);
+		}
+		{
+			ZoneScopedN("Tilemap buffer update");
+			updateTileMap(currentFrame);
 		}
 		{
 			ZoneScopedN("Lights buffer update");
