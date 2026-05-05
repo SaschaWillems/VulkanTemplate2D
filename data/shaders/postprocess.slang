@@ -11,10 +11,7 @@ struct UBO
     float timer;
     float viewportAR;
     float postProcessTimer;
-    float2 playerPos;
-    float2 screenDim;
     float2 screenRes;
-    float2 tilemapDim;
     uint32_t lightCount;
     float dayNightCycle;
 };

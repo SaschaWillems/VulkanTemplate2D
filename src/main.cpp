@@ -48,10 +48,7 @@ struct ShaderData {
 	float timer{ 0.0f };
 	float viewportAR;
 	float postProcessTimer{ 0.0f };
-	glm::vec2 playerPos{ 0.0f };
-	glm::vec2 screenDim{ 0.0f };
 	glm::vec2 screenRes{ 0.0f };
-	glm::vec2 tilemapDim{ 0.0f };
 	uint32_t lightCount{ 0 };
 	float dayNightCycle{ 0.0f };
 } shaderData;
@@ -1556,8 +1553,6 @@ public:
 		//shaderData.view = glm::mat4(1.0f);
 		shaderData.mvp = glm::translate(glm::mat4(1.0f), -glm::vec3(game.player.position / screenDim, 0.0f));
 		shaderData.mvp *= glm::ortho(-screenDim.x, screenDim.x, -screenDim.x, screenDim.x);
-		shaderData.playerPos = game.player.position;
-		shaderData.screenDim = screenDim;
 		shaderData.screenRes = glm::vec2((float)width, (float)height);
 		shaderData.lightCount = currentFrame.lightsBufferDrawCount;
 		shaderData.dayNightCycle = game.dayNightCycle <= 1.0f ? game.dayNightCycle : 2.0 - game.dayNightCycle;
