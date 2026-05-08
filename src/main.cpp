@@ -363,6 +363,10 @@ public:
 			}
 		}
 
+		// Font
+		loadBmFont();
+		loadTexture(getAssetPath() + "default-font.png", fontImageIndex);
+
 		// Numbers
 		game.firstNumberImageIndex = static_cast<uint32_t>(textures.size());
 		for (uint32_t i = 0; i < 10; i++) {
