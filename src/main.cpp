@@ -12,6 +12,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <stdexcept>
 #include <random>
+#include <format>
 #include "time.h"
 #include <SFML/Audio.hpp>
 #include <json.hpp>
@@ -88,7 +89,32 @@ enum class PostProcessEffect {
 	FadeIn = 1
 };
 
+// AngelCode .fnt format structs and classes
+
+struct bmchar {
+	uint32_t x, y;
+	uint32_t width;
+	uint32_t height;
+	int32_t xoffset;
+	int32_t yoffset;
+	int32_t xadvance;
+	uint32_t page;
+};
+std::array<bmchar, 255> fontChars;
+
 Game::Game game;
+
+// @todo
+struct UIText {
+	glm::vec2 pos;
+	//glm::vec3 color;
+	std::string text;
+};
+
+struct UI {
+	std::vector<UIText> textElements;
+};
+UI ui;
 
 class Application : public VulkanApplication {
 private:
@@ -114,6 +140,10 @@ private:
 		Buffer* uiBuffer{ nullptr };
 		uint32_t uiBufferSize{ 0 };
 		uint32_t uiBufferVertexCount{ 0 };
+
+		Buffer* uiTextBuffer{ nullptr };
+		uint32_t uiTextBufferSize{ 0 };
+		uint32_t uiTextBufferVertexCount{ 0 };
 
 		// @todo: Tilemap rendering
 		uint32_t tilemapInstanceCount{ 0 };
@@ -159,6 +189,7 @@ private:
 	float postProcessTimeFactor{ 1.0f };
 	uint32_t visibleTileCount{ 32 };
 	uint32_t crtFrameImageIndex{ 0 };
+	uint32_t fontImageIndex{ 0 };
 public:	
 	Application() : VulkanApplication() {
 		apiVersion = VK_API_VERSION_1_3;
@@ -198,6 +229,7 @@ public:
 			delete frame.instanceBuffer;
 			delete frame.lightsBuffer;
 			delete frame.uiBuffer;
+			delete frame.uiTextBuffer;
 			delete[] frame.instances;
 			delete frame.tilemapInstanceBuffer;
 		}
@@ -273,6 +305,47 @@ public:
 		stbi_image_free(img);
 
 		index = static_cast<uint32_t>(textures.size() - 1);
+	}
+
+	// Basic parser for AngelCode bitmap font format files
+	void loadBmFont()
+	{
+		auto nextValuePair = [](std::stringstream* stream) {
+			std::string pair;
+			*stream >> pair;
+			size_t spos = pair.find("=");
+			std::string value = pair.substr(spos + 1);
+			int32_t val = std::stoi(value);
+			return val;
+		};
+
+		std::string fileName = getAssetPath() + "default-font.fnt";
+		std::filebuf fileBuffer;
+		fileBuffer.open(fileName, std::ios::in);
+		std::istream istream(&fileBuffer);
+		assert(istream.good());
+		while (!istream.eof()) {
+			std::string line;
+			std::stringstream lineStream;
+			std::getline(istream, line);
+			lineStream << line;
+			std::string info;
+			lineStream >> info;
+			if (info == "char") {
+				uint32_t charid = nextValuePair(&lineStream);
+				if (charid > 255) {
+					continue;
+				}
+				fontChars[charid].x = nextValuePair(&lineStream);
+				fontChars[charid].y = nextValuePair(&lineStream);
+				fontChars[charid].width = nextValuePair(&lineStream);
+				fontChars[charid].height = nextValuePair(&lineStream);
+				fontChars[charid].xoffset = nextValuePair(&lineStream);
+				fontChars[charid].yoffset = nextValuePair(&lineStream);
+				fontChars[charid].xadvance = nextValuePair(&lineStream);
+				fontChars[charid].page = nextValuePair(&lineStream);
+			}
+		}
 	}
 
 	void loadTexture(const std::string filename)
@@ -747,22 +820,24 @@ public:
 	}
 
 	void updateUIBuffer(FrameObjects& frame) {
+		const glm::vec2 origin{ -0.95f };
+		
 		std::vector<Vertex> v{};
 
 		// @todo: reserve instead of push_back
 		auto addElement = [&v](glm::vec4 r, glm::vec4 uv, float z = 0.0f) {
 			// x:top y:left, z:bottom w:right
-			v.push_back({ { r.w - 1.0f, r.z - 1.0f, z }, { uv.w, uv.z } });
-			v.push_back({ { r.y - 1.0f, r.z - 1.0f, z }, { uv.y, uv.z } });
-			v.push_back({ { r.y - 1.0f, r.x - 1.0f, z }, { uv.y, uv.x } });
-			v.push_back({ { r.y - 1.0f, r.x - 1.0f, z }, { uv.y, uv.x } });
-			v.push_back({ { r.w - 1.0f, r.x - 1.0f, z }, { uv.w, uv.x } });
-			v.push_back({ { r.w - 1.0f, r.z - 1.0f, z }, { uv.w, uv.z } });
+			v.push_back({ { r.w, r.z, z }, { uv.w, uv.z } });
+			v.push_back({ { r.y, r.z, z }, { uv.y, uv.z } });
+			v.push_back({ { r.y, r.x, z }, { uv.y, uv.x } });
+			v.push_back({ { r.y, r.x, z }, { uv.y, uv.x } });
+			v.push_back({ { r.w, r.x, z }, { uv.w, uv.x } });
+			v.push_back({ { r.w, r.z, z }, { uv.w, uv.z } });
 		};
 
 		auto t = 1.0f / 4.0f;
 		auto h = 0.025f;
-		glm::vec2 o = { 0.05f, 0.05f };
+		glm::vec2 o = origin;
 
 		addElement({ o.y + 0.0f, o.x + 0.0f, o.y + h, o.x + 0.25f }, { 0.0f, 0.0f, t, 1.0f });
 		addElement({ o.y + 0.0f, o.x + 0.0f, o.y + h, o.x + 0.25f * game.player.health / game.player.maxHealth }, { t, 0.0f, t + t, 1.0f });
@@ -798,6 +873,76 @@ public:
 #else
 		// todo
 #endif
+
+		// Text elements are separate
+
+		// @todo
+		ui.textElements.clear();
+		// @todo: test
+		ui.textElements.push_back({
+			.pos = glm::vec2(0.0f, 0.2f),
+			.text = std::format("Killed: {}", game.currentRun.monstersKilled)
+		});
+		ui.textElements.push_back({
+			.pos = glm::vec2(0.0f, 0.25f),
+			.text = std::format("Run: {}m {}s ", static_cast<int32_t>(floor(game.currentRun.duration)) / 60, static_cast<int32_t>(floor(game.currentRun.duration)) % 60)
+		});
+		ui.textElements.push_back({
+			.pos = glm::vec2(0.0f, 0.3f),
+			.text = std::format("{} fps", lastFPS)
+		});
+
+		std::vector<Vertex> tv{};
+
+		const uint32_t texWidth = 399;
+		const uint32_t texHeight = 404;
+
+		if (ui.textElements.size() > 0) {
+			for (auto& elem : ui.textElements) {
+				float posx = origin.x + elem.pos.x;				
+				for (auto i = 0; i < elem.text.size(); i++) {
+					bmchar* charInfo = &fontChars[(int)elem.text[i]];
+					if (charInfo->width == 0) {
+						charInfo->width = 36;
+					}
+					const float sc = 36.0f * 72.0f;
+					float charw = ((float)(charInfo->width) / sc);
+					float dimx = charw;
+					float charh = ((float)(charInfo->height) / sc);
+					float dimy = charh;
+					float us = charInfo->x / (float)texWidth;
+					float ue = (charInfo->x + charInfo->width) / (float)texWidth;
+					float ts = charInfo->y / (float)texHeight;
+					float te = (charInfo->y + charInfo->height) / (float)texHeight;
+					float xo = charInfo->xoffset / sc;
+					float yo = charInfo->yoffset / sc;
+					float posy = origin.y + elem.pos.y + yo;
+					tv.push_back({ { posx + dimx + xo,  posy + dimy, 0.0f }, { ue, te } });
+					tv.push_back({ { posx + xo,         posy + dimy, 0.0f }, { us, te } });
+					tv.push_back({ { posx + xo,         posy,        0.0f }, { us, ts } });
+					tv.push_back({ { posx + xo,         posy,        0.0f }, { us, ts } });
+					tv.push_back({ { posx + dimx + xo,  posy,        0.0f }, { ue, ts } });
+					tv.push_back({ { posx + dimx + xo,  posy + dimy, 0.0f }, { ue, te } });
+					float advance = ((float)(charInfo->xadvance) / sc);
+					posx += advance;
+				}
+			}
+		}
+
+		const size_t textVertexBufferSize = tv.size() * sizeof(Vertex);
+
+		if (frame.uiTextBufferSize < textVertexBufferSize) {
+			delete frame.uiTextBuffer;
+			frame.uiTextBuffer = new Buffer({
+				.usageFlags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+				.size = textVertexBufferSize,
+				.vmaAllocFlags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT,
+				.map = true,
+			});
+			frame.uiTextBufferSize = textVertexBufferSize;
+			frame.uiTextBufferVertexCount = static_cast<uint32_t>(tv.size());
+		}
+		memcpy(frame.uiTextBuffer->mapped, tv.data(), textVertexBufferSize);
 	}
 
 	void prepare() {
@@ -1219,6 +1364,62 @@ public:
 			.enableHotReload = true
 		});
 		pipelineList.push_back(pipelines["gameui"]);
+		VkPipelineColorBlendAttachmentState blendAttachmentStateUiText{
+			.blendEnable = VK_TRUE,
+			.srcColorBlendFactor = VK_BLEND_FACTOR_ONE,
+			.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+			.colorBlendOp = VK_BLEND_OP_ADD,
+			.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+			.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+			.alphaBlendOp = VK_BLEND_OP_ADD,
+			.colorWriteMask = 0xf,
+		};
+
+		pipelines["gameuitext"] = new Pipeline({
+			.shaders = {
+				.filename = getAssetPath() + "shaders/uitext.slang",
+				.stages = { VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT }
+			},
+			.cache = pipelineCache,
+			.layout = *pipelineLayouts["gameui"],
+			.vertexInput = vertexInput,
+			.inputAssemblyState = {
+				.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+			},
+			.viewportState = {
+				.viewportCount = 1,
+				.scissorCount = 1
+			},
+			.rasterizationState = {
+				.polygonMode = VK_POLYGON_MODE_FILL,
+				.cullMode = VK_CULL_MODE_BACK_BIT,
+				.frontFace = VK_FRONT_FACE_CLOCKWISE,
+				.lineWidth = 1.0f
+			},
+			.multisampleState = {
+				.rasterizationSamples = settings.sampleCount,
+			},
+			.depthStencilState = {
+				.depthTestEnable = VK_FALSE,
+				.depthWriteEnable = VK_FALSE,
+				.depthCompareOp = VK_COMPARE_OP_ALWAYS,
+			},
+			.blending = {
+				.attachments = { blendAttachmentStateUiText }
+			},
+			.dynamicState = {
+				DynamicState::Scissor,
+				DynamicState::Viewport
+			},
+			.pipelineRenderingInfo = {
+				.colorAttachmentCount = 1,
+				.pColorAttachmentFormats = &swapChain->colorFormat,
+				.depthAttachmentFormat = depthFormat,
+				.stencilAttachmentFormat = depthFormat
+			},
+			.enableHotReload = true
+			});
+		pipelineList.push_back(pipelines["gameui"]);
 		// Post process
 		descriptorSetLayoutRenderImage = new DescriptorSetLayout({
 			.descriptorIndexing = true,
@@ -1461,6 +1662,15 @@ public:
 		cb->bindPipeline(pipelines["gameui"]);
 		cb->updatePushConstant(pipelineLayouts["gameui"], 0, &game.uiImageIndex);
 		cb->draw(frame.uiBufferVertexCount, 1, 0, 0);
+		// Text
+		// @todo: Separate pipeline?
+		if (frame.uiTextBufferVertexCount > 0) {
+			cb->bindVertexBuffers(0, 1, { frame.uiTextBuffer->buffer });
+			cb->bindPipeline(pipelines["gameuitext"]);
+			cb->updatePushConstant(pipelineLayouts["gameui"], 0, &fontImageIndex);
+			cb->draw(frame.uiTextBufferVertexCount, 1, 0, 0);
+		}
+
 		cb->endRendering();
 
 		// Transition color image for presentation
