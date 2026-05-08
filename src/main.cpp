@@ -430,13 +430,6 @@ public:
 	{
 		auto& tilemap = game.tilemap;
 
-		//game.tilemap.setSize(TILEMAP_MAX_DIM, TILEMAP_MAX_DIM);
-		game.tilemap.screenFactor = { 1.0f / (screenDim.x * 2.0f / (float)visibleTileCount), 1.0f / (screenDim.y * 2.0f / (float)visibleTileCount) };
-		shaderData.tilemapDim = { (float)game.tilemap.width, (float)game.tilemap.height };
-		//const size_t texBufferSize = game.tilemap.width * game.tilemap.height * 4;
-		//uint32_t* texBuffer = new uint32_t[texBufferSize];
-		//memset(texBuffer, 0, texBufferSize);
-
 		// @todo: random tiles for testing
 		std::uniform_int_distribution<uint32_t> rndTile(0, static_cast<uint32_t>(0, 2));
 		for (auto x = 0; x < TILEMAP_MAX_DIM; x++) {
@@ -519,13 +512,13 @@ public:
 	{
 		std::vector<Vertex> vertices =
 		{
-			{ {  1.0f,  1.0f, 0.0f }, { 1.0f, 1.0f } },
-			{ { -1.0f,  1.0f, 0.0f }, { 0.0f, 1.0f } },
-			{ { -1.0f, -1.0f, 0.0f }, { 0.0f, 0.0f } },
+			{ {  0.5f,  0.5f, 0.0f }, { 1.0f, 1.0f } },
+			{ { -0.5f,  0.5f, 0.0f }, { 0.0f, 1.0f } },
+			{ { -0.5f, -0.5f, 0.0f }, { 0.0f, 0.0f } },
 
-			{ { -1.0f, -1.0f, 0.0f }, { 0.0f, 0.0f } },
-			{ {  1.0f, -1.0f, 0.0f }, { 1.0f, 0.0f } },
-			{ {  1.0f,  1.0f, 0.0f }, { 1.0f, 1.0f } },
+			{ { -0.5f, -0.5f, 0.0f }, { 0.0f, 0.0f } },
+			{ {  0.5f, -0.5f, 0.0f }, { 1.0f, 0.0f } },
+			{ {  0.5f,  0.5f, 0.0f }, { 1.0f, 1.0f } },
 		};
 
 		const size_t vertexBufferSize = vertices.size() * sizeof(Vertex);
@@ -578,19 +571,18 @@ public:
 		}
 
 		frame.tilemapInstanceCount = 0;
-		glm::ivec2 currentTilePos = glm::ivec2{ (int)(floor(game.player.position.x / 2.0f)), (int)(floor(game.player.position.y / 2.0f)) };
-		// @todo: calculate from screen dimension
-		int32_t sx = currentTilePos.x - 10;
-		int32_t ex = currentTilePos.x + 10;
-		int32_t sy = currentTilePos.y - 10;
-		int32_t ey = currentTilePos.y + 10;
+		glm::ivec2 currentTilePos = game.player.tilePos();
+		int32_t sx = currentTilePos.x - (int32_t)(screenDim.x * 1.25f);
+		int32_t ex = currentTilePos.x + (int32_t)(screenDim.x * 1.25f);
+		int32_t sy = currentTilePos.y - (int32_t)(screenDim.y * 1.25f);
+		int32_t ey = currentTilePos.y + (int32_t)(screenDim.y * 1.25f);
 		for (int32_t y = sy; y <= ey; y++) {
 			for (int32_t x = sx; x <= ex; x++) {
 				if ((x < 0) || (y < 0) || (x > TILEMAP_MAX_DIM - 1) || (y > TILEMAP_MAX_DIM - 1)) {
 					continue;
 				}
 				tilemapInstances[frame.tilemapInstanceCount] = {
-					.pos = {.x = (uint32_t)x * 2, .y = (uint32_t)y * 2 },
+					.pos = {.x = (uint32_t)x, .y = (uint32_t)y },
 					.imageIndex = tilemap.data[x][y] + game.tilemap.firstTileIndex
 				};
 				frame.tilemapInstanceCount++;
@@ -965,7 +957,7 @@ public:
 
 		loadAssets();
 		generateQuad();
-		createTileMap();
+		initTileMap();
 
 		// Init player
 		auto& player = game.player;
