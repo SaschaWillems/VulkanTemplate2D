@@ -1,70 +1,59 @@
 [[vk::binding(0, 0)]]
 Texture2D textures[];
-[[vk::binding(0, 0)]]
-Texture2D<uint> texturesInt[];
 [[vk::binding(0, 1)]]
 SamplerState samplers[];
-
-struct PushConsts
-{
-    uint tileMapIndex;
-    uint tileSetStartIndex;
-    float tileCountX;
-    float tileCountY;
-};
-[[vk::push_constant]] PushConsts pushConsts;
 
 struct UBO
 {
     float4x4 mvp;
-    float time;
-    float timer;
-    float tileMapSpeed;
-    float _unused0;
-    float2 playerPos;
-    float2 screenDim;
-    float2 screenRes;
-    float2 tilemapDim;
-    uint32_t lightCount;
-    float dayNightCycle;
+	float time;
+	float2 resolution;
 };
 [[vk::binding(0, 2)]]
-ConstantBuffer<UBO> ubo;
+ConstantBuffer<UBO> ubo : register(b0,space2);
+
+struct UBOA
+{
+    float4x4 projection;
+    float4x4 view;
+    float time;
+    float2 resolution;
+};
+[[vk::binding(0, 0)]]
+ConstantBuffer<UBOA> uboa;
+
+struct VSInput
+{
+    [[vk::location(0)]] float3 pos : POSITION0;
+    [[vk::location(1)]] float2 uv : TEXCOORD0;
+    // Instanced attributes
+    [[vk::location(2)]] int2 instancePos : POSITION1;
+    [[vk::location(3)]] int instanceTextureIndex : TEXCOORD3;
+};
 
 struct VSOutput
 {
-	float4 pos : SV_POSITION;
-    float2 uv;
-    float2 uvbase;
-    float4 color;
-    nointerpolation int textureIndex;
+    float4 pos : SV_POSITION;
+    [[vk::location(0)]] float2 uv : TEXCOORD0;
+    [[vk::location(1)]] float4 color : COLOR0;
+    [[vk::location(2)]] nointerpolation int textureIndex : TEXCOORD1;
 };
 
 [shader("vertex")]
-VSOutput main(uint VertexIndex : SV_VertexID)
+VSOutput main(VSInput input)
 {
     VSOutput output;
-    float2 uv = float2((VertexIndex << 1) & 2, VertexIndex & 2);
-    output.uvbase = uv;
-    output.uv = float2(uv.x - 0.5, uv.y - 0.5);
-    output.uv += ubo.playerPos / (ubo.screenDim * 2.0f);
-    output.pos = float4(uv * 2.0f + -1.0f, 0.0f, 1.0f);
+    float3 locPos = input.pos + float3(input.instancePos.x, input.instancePos.y, 0.0);
+    output.pos = mul(ubo.mvp, float4(locPos, 1.0));
+    output.uv = input.uv;
+    output.textureIndex = input.instanceTextureIndex;
+    output.color = float4(1.0);
     return output;
 }
 
 [shader("fragment")]
-float4 main(VSOutput input)
+float4 main(VSOutput input) : SV_TARGET
 {
-    const float2 _div = float2(pushConsts.tileCountX, pushConsts.tileCountY);
-    float2 uv = input.uv * _div;
-    // Center at player
-    uv += 0.5;
-    if (uv.x < 0.0 || uv.y < 0.0 || uv.x > ubo.tilemapDim.x || uv.y > ubo.tilemapDim.y) {
-        return float4(0.0, 0.0, 0.0, 1.0);
-    }
-    uint texIdx = texturesInt[pushConsts.tileMapIndex].Load(int3(uv, 0)) + pushConsts.tileSetStartIndex;
-    float2 locuv = uv;
-    locuv.x = fmod(uv.x, 1.0);
-    locuv.y = fmod(uv.y, 1.0);
-    return textures[texIdx].Sample(samplers[0], locuv);
+    float4 color = textures[input.textureIndex].Sample(samplers[0], input.uv);
+    return color * input.color;
 }

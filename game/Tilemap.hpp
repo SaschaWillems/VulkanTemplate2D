@@ -20,9 +20,6 @@ namespace Game {
 	public:
 		// @todo: multiple layers? (background/foreground)
 		uint32_t data[TILEMAP_MAX_DIM][TILEMAP_MAX_DIM];
-		vks::Texture2D* texture{ nullptr };
-		Sampler* sampler{ nullptr };
-		DescriptorSet* descriptorSetSampler{ nullptr };
 		uint32_t imageIndex;
 		uint32_t firstTileIndex;
 		uint32_t lastTileIndex;

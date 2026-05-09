@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025 by Sascha Willems - www.saschawillems.de
+ * Copyright (C) 2023-2026 by Sascha Willems - www.saschawillems.de
  *
  * This code is licensed under the MIT license (MIT) (http://opensource.org/licenses/MIT)
  */
@@ -403,15 +403,6 @@ public:
 		};
 		spriteSampler = new Sampler(samplerCI);
 
-		samplerCI = {
-			.name = "Tile map sampler",
-			.magFilter = VK_FILTER_NEAREST,
-			.minFilter = VK_FILTER_NEAREST,
-			.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-			.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-		};
-		game.tilemap.sampler = new Sampler(samplerCI);
-
 		// @todo
 		// Audio
 		const std::map<std::string, std::string> soundFiles = {
@@ -497,15 +488,6 @@ public:
 				{.dstBinding = 0, .descriptorCount = samplerCount, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .pImageInfo = samplerDescriptors.data()},
 			}
 		});
-
-		game.tilemap.descriptorSetSampler = new DescriptorSet({
-			.pool = descriptorPool,
-			.variableDescriptorCount = samplerCount,
-			.layouts = { descriptorSetLayoutSamplers->handle },
-			.descriptors = {
-				{.dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER, .pImageInfo = &game.tilemap.sampler->descriptor},
-			}
-		});
 	}
 
 	void generateQuad()
@@ -550,11 +532,8 @@ public:
 		delete stagingBuffer;
 	}
 
-	// @todo
-	// Tile map for the background is stored as a single one integer channel format, with each pixel storing a zero-based tile index
+	// Tilemap is rendered via instancing, one per each visible tile
 	void updateTileMap(FrameObjects& frame) {
-		// @todo: only visible tiles
-
 		Game::Tilemap& tilemap = game.tilemap;
 
 		if (!tilemapInstances) {
@@ -815,6 +794,7 @@ public:
 		}
 	}
 
+	// Game UI (not ImGui debug UI)
 	void updateUIBuffer(FrameObjects& frame) {
 		const glm::vec2 origin{ -0.95f };
 		
@@ -964,11 +944,9 @@ public:
 		player.speed = 5.0f;
 		player.scale = 1.0f;
 		player.position = glm::vec2((float)game.tilemap.width / 2.0f, (float)game.tilemap.height / 2.0f);
-		// @todo
-		//game.player.position = glm::vec2(0.0f);
 		// @todo: Proper weapon setup/selection
 		player.weapons.resize(1);
-		player.weapons[0] = game.playerWeaponTypes[1];
+		player.weapons[0] = game.playerWeaponTypes[2];
 
 		// @todo: for benchmarking, this is > 60 fps on my setup
 		//spawnMonsters(1150000);
@@ -1111,64 +1089,9 @@ public:
 		// Tilemap
 		pipelineLayouts["tilemap"] = new PipelineLayout({
 			.layouts = { descriptorSetLayoutTextures->handle, descriptorSetLayoutSamplers->handle, descriptorSetLayoutUniforms->handle },
-			// Index of the tilemap is passed via push constant, tile set starts at that index + 1
+			// For debug viz
 			.pushConstantRanges = {
-				{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = sizeof(uint32_t) * 2 + sizeof(float) * 2}
-			}
-		});
-
-		pipelines["tilemap"] = new Pipeline({
-			.shaders = {
-				.filename = getAssetPath() + "shaders/tilemap.slang",
-				.stages = { VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT }
-			},
-			.cache = pipelineCache,
-			.layout = *pipelineLayouts["tilemap"],
-			//.vertexInput = vertexInput,
-			.inputAssemblyState = {
-				.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
-			},
-			.viewportState = {
-				.viewportCount = 1,
-				.scissorCount = 1
-			},
-			.rasterizationState = {
-				.polygonMode = VK_POLYGON_MODE_FILL,
-				.cullMode = VK_CULL_MODE_BACK_BIT,
-				.frontFace = VK_FRONT_FACE_CLOCKWISE,
-				.lineWidth = 1.0f
-			},
-			.multisampleState = {
-				.rasterizationSamples = settings.sampleCount,
-			},
-			.depthStencilState = {
-				.depthTestEnable = VK_FALSE,
-				.depthWriteEnable = VK_FALSE,
-				.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
-			},
-			.blending = {
-				.attachments = { blendAttachmentState }
-			},
-			.dynamicState = {
-				DynamicState::Scissor,
-				DynamicState::Viewport
-			},
-			.pipelineRenderingInfo = {
-				.colorAttachmentCount = 1,
-				.pColorAttachmentFormats = &swapChain->colorFormat,
-				.depthAttachmentFormat = depthFormat,
-				.stencilAttachmentFormat = depthFormat
-			},
-			.enableHotReload = true
-		});
-		pipelineList.push_back(pipelines["tilemap"]);
-
-		// Tilemap "naive" (easier to handle)
-		pipelineLayouts["tilemap-naive"] = new PipelineLayout({
-			.layouts = { descriptorSetLayoutTextures->handle, descriptorSetLayoutSamplers->handle, descriptorSetLayoutUniforms->handle },
-			// X, Y, Tileindex
-			.pushConstantRanges = {
-				{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = sizeof(uint32_t) * 3}
+				{.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, .offset = 0, .size = sizeof(uint32_t) * 2}
 			}
 		});
 
@@ -1186,13 +1109,13 @@ public:
 			}
 		};
 
-		pipelines["tilemap-naive"] = new Pipeline({
+		pipelines["tilemap"] = new Pipeline({
 			.shaders = {
-				.filename = getAssetPath() + "shaders/tilemap-naive.slang",
+				.filename = getAssetPath() + "shaders/tilemap.slang",
 				.stages = { VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT }
 			},
 			.cache = pipelineCache,
-			.layout = *pipelineLayouts["tilemap-naive"],
+			.layout = *pipelineLayouts["tilemap"],
 			.vertexInput = vertexInput,
 			.inputAssemblyState = {
 				.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
@@ -1230,7 +1153,7 @@ public:
 			},
 			.enableHotReload = true
 			});
-		pipelineList.push_back(pipelines["tilemap-naive"]);
+		pipelineList.push_back(pipelines["tilemap"]);
 		// CRT frame
 		VkPipelineColorBlendAttachmentState blendAttachmentStateEnabled{
 			.blendEnable = VK_TRUE,
@@ -1614,34 +1537,13 @@ public:
 		float vpLeft = ((float)width - vpWidth) / 2.0f;
 		cb->setViewport(vpLeft, 0.0f, vpWidth, vpHeight, 0.0f, 1.0f);
 		cb->setScissor(0, 0, width, height);
-
-		// Draw tilemap (background)
-		struct PushConsts {
-			uint32_t uints[2];
-			float floats[2];
-		} pushConsts{};
-		pushConsts.uints[0] = game.tilemap.imageIndex;
-		pushConsts.uints[1] = game.tilemap.firstTileIndex;
-		pushConsts.floats[0] = (float)width / 32.0f;
-		pushConsts.floats[1] = (float)height / 32.0f;
-
-		pushConsts.floats[0] = 1024.0f / (float)visibleTileCount;
-		pushConsts.floats[1] = 1024.0f / (float)visibleTileCount;
-
-#ifdef TILEMAP_VAR_A
-		cb->bindDescriptorSets(pipelineLayouts["tilemap"], { descriptorSetTextures, game.tilemap.descriptorSetSampler, frame.descriptorSet });
-		cb->bindPipeline(pipelines["tilemap"]);
-		cb->updatePushConstant(pipelineLayouts["tilemap"], 0, &pushConsts);
-		cb->draw(3, 1, 0, 0);
-#else
-		// Tilemap variant B
-		// @todo: only display tiles actually visible (update similar to instance buffer for sprites)
+	
+		// Tilemap
 		cb->bindVertexBuffers(0, 1, { quadBuffer->buffer });
 		cb->bindVertexBuffers(1, 1, { frame.tilemapInstanceBuffer->buffer });
-		cb->bindDescriptorSets(pipelineLayouts["tilemap-naive"], { descriptorSetTextures, descriptorSetSamplers, frame.descriptorSet });
-		cb->bindPipeline(pipelines["tilemap-naive"]);
+		cb->bindDescriptorSets(pipelineLayouts["tilemap"], { descriptorSetTextures, descriptorSetSamplers, frame.descriptorSet });
+		cb->bindPipeline(pipelines["tilemap"]);
 		cb->draw(6, frame.tilemapInstanceCount, 0, 0);
-#endif
 
 		// Draw sprites using instancing
 		// Instancing buffer stores sprite index, position, scale, direction (to flip/rotate) uv, maybe color for health state
