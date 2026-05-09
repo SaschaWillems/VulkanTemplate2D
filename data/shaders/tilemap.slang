@@ -40,7 +40,7 @@ struct VSOutput
 };
 
 [shader("vertex")]
-VSOutput main(VSInput input)
+VSOutput main(VSInput input, uniform int2 selectedTile)
 {
     VSOutput output;
     float3 locPos = input.pos + float3(input.instancePos.x, input.instancePos.y, 0.0);
@@ -48,6 +48,9 @@ VSOutput main(VSInput input)
     output.uv = input.uv;
     output.textureIndex = input.instanceTextureIndex;
     output.color = float4(1.0);
+    if ((input.instancePos.x == selectedTile.x) && (input.instancePos.y == selectedTile.y)) {
+        output.color *= 16.0;
+    }
     return output;
 }
 

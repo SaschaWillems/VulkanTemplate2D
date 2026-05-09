@@ -88,8 +88,8 @@ private:
 	void handleMouseMove(int32_t x, int32_t y);
 	VkDebugUtilsMessengerEXT debugUtilsMessenger;
 	VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures{};
-	CommandLineParser commandLineParser;
 protected:
+	CommandLineParser commandLineParser;
 	struct MultisampleTarget {
 		ImageAttachment color;
 		ImageAttachment depth;

@@ -616,6 +616,7 @@ VulkanApplication::VulkanApplication()
 	commandLineParser.add("height", { "-h", "--height" }, 1, "Set window height");
 	commandLineParser.add("gpuselection", { "-g", "--gpu" }, 1, "Select GPU to run on");
 	commandLineParser.add("gpulist", { "-gl", "--listgpus" }, 0, "Display a list of available Vulkan devices");
+	commandLineParser.add("editormode", { "-e", "--editormode" }, 0, "");
 
 	commandLineParser.parse(args);
 	if (commandLineParser.isSet("help")) {

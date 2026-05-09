@@ -89,6 +89,8 @@ enum class PostProcessEffect {
 	FadeIn = 1
 };
 
+float kbDebounce;
+
 // AngelCode .fnt format structs and classes
 
 struct bmchar {
@@ -115,6 +117,13 @@ struct UI {
 	std::vector<UIText> textElements;
 };
 UI ui;
+
+struct Editor {
+	bool active{ false };
+	glm::vec2 pos{ 0.0f };
+	glm::ivec2 selectedTile{ 0 };
+	uint32_t tileIndex{ 0 };
+} editor;
 
 class Application : public VulkanApplication {
 private:
@@ -184,7 +193,8 @@ private:
 	std::unordered_map<std::string, Pipeline*> pipelines;
 	sf::Music backgroundMusic;
 	Buffer* quadBuffer{ nullptr };
-	glm::vec2 screenDim{ 0.0f };
+	const glm::vec2 screenDimBase{ 12.5f };
+	glm::vec2 screenDim{ screenDimBase };
 	PostProcessEffect postProcessEffect{ PostProcessEffect::None };
 	float postProcessTimeFactor{ 1.0f };
 	uint32_t visibleTileCount{ 32 };
@@ -211,11 +221,6 @@ public:
 		audioManager = new AudioManager();
 
 		slangCompiler = new SlangCompiler();
-
-		// @todo: absolute or relative?
-		const float aspectRatio = (float)width / (float)height;
-		screenDim = glm::vec2(25.0f/* * aspectRatio*/, 25.0f);
-		//shaderData.projection = glm::ortho(-screenDim.x, screenDim.x, -screenDim.x, screenDim.x);
 
 		title = "Bindless Survivors";
 	}
@@ -550,7 +555,7 @@ public:
 		}
 
 		frame.tilemapInstanceCount = 0;
-		glm::ivec2 currentTilePos = game.player.tilePos();
+		glm::ivec2 currentTilePos = editor.active ? glm::ivec2(editor.pos) : game.player.tilePos();
 		int32_t sx = currentTilePos.x - (int32_t)(screenDim.x * 1.25f);
 		int32_t ex = currentTilePos.x + (int32_t)(screenDim.x * 1.25f);
 		int32_t sy = currentTilePos.y - (int32_t)(screenDim.y * 1.25f);
@@ -868,6 +873,17 @@ public:
 			.text = std::format("{} fps", lastFPS)
 		});
 
+		if (editor.active) {
+			ui.textElements.push_back({
+				.pos = glm::vec2(0.0f, 0.35f),
+				.text = "Editor mode enabled"
+			});
+			ui.textElements.push_back({
+				.pos = glm::vec2(0.0f, 0.4f),
+				.text = std::format("Tileindex: {}", editor.tileIndex)
+			});
+		}
+
 		std::vector<Vertex> tv{};
 
 		const uint32_t texWidth = 399;
@@ -924,6 +940,10 @@ public:
 	void prepare() {
 		VulkanApplication::prepare();
 
+		if (commandLineParser.isSet("editormode")) {
+			editor.active = true;
+		}
+
 		// Create one large staging buffer to be reused for copies
 		stagingBuffer = new Buffer({
 			.usageFlags = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -947,6 +967,8 @@ public:
 		// @todo: Proper weapon setup/selection
 		player.weapons.resize(1);
 		player.weapons[0] = game.playerWeaponTypes[2];
+
+		editor.pos = glm::ivec2(game.tilemap.width / 2, (float)game.tilemap.height / 2);
 
 		// @todo: for benchmarking, this is > 60 fps on my setup
 		//spawnMonsters(1150000);
@@ -1444,6 +1466,8 @@ public:
 
 		setPostProcessEffect(PostProcessEffect::FadeIn);
 
+		overlay->visible = false;
+
 		prepared = true;
 	}
 
@@ -1542,6 +1566,14 @@ public:
 		cb->bindVertexBuffers(0, 1, { quadBuffer->buffer });
 		cb->bindVertexBuffers(1, 1, { frame.tilemapInstanceBuffer->buffer });
 		cb->bindDescriptorSets(pipelineLayouts["tilemap"], { descriptorSetTextures, descriptorSetSamplers, frame.descriptorSet });
+		// @todo: only edit mode
+		glm::ivec2 selectedTile{ -1 };
+		if (editor.active) {
+			selectedTile = editor.selectedTile;
+		} else {
+			selectedTile = game.player.tilePos();
+		}
+		cb->updatePushConstant(pipelineLayouts["tilemap"], 0, &selectedTile);
 		cb->bindPipeline(pipelines["tilemap"]);
 		cb->draw(6, frame.tilemapInstanceCount, 0, 0);
 
@@ -1635,6 +1667,42 @@ public:
 			if (!paused) {
 				game.update(frameTimer);
 				game.updateInput(frameTimer);
+			// @todo
+			if (editor.active) {
+				glm::vec2 direction = glm::vec2(.0f, .0f);
+				if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
+					direction.x = -1.0f;
+				}
+				if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
+					direction.x = 1.0f;
+				}
+				if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) {
+					direction.y = -1.0f;
+				}
+				if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
+					direction.y = 1.0f;
+				}
+				if (kbDebounce > 0.0f) {
+					kbDebounce -= frameTimer * 15.0f;
+				} else {
+					if (sf::Keyboard::isKeyPressed(sf::Keyboard::Subtract) && editor.tileIndex > 0) {
+						editor.tileIndex -= 1;
+						kbDebounce = 1.0f;
+					}
+					if (sf::Keyboard::isKeyPressed(sf::Keyboard::Add) && editor.tileIndex < (game.tilemap.lastTileIndex - game.tilemap.firstTileIndex)) {
+						editor.tileIndex += 1;
+						kbDebounce = 1.0f;
+					}
+				}
+				editor.pos += direction * 25.0f * frameTimer;
+				auto mo = camera.mouse.cursorPosNDC - glm::vec2(0.5f);
+				mo *= glm::vec2(screenDim.x * 2.0f, screenDim.y * 2.0f);
+				editor.selectedTile = glm::ivec2(editor.pos + mo + glm::vec2(0.5));
+				if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
+					if (editor.selectedTile.x > -1 && editor.selectedTile.x < TILEMAP_MAX_DIM && editor.selectedTile.y > -1 && editor.selectedTile.y < TILEMAP_MAX_DIM) {
+						game.tilemap.data[editor.selectedTile.x][editor.selectedTile.y] = editor.tileIndex;
+					}
+				}
 			}
 		}
 		{
@@ -1658,8 +1726,11 @@ public:
 		updatePostProcessEffect(frameTimer);
 
 		shaderData.timer = timer;
-		//shaderData.view = glm::mat4(1.0f);
-		shaderData.mvp = glm::translate(glm::mat4(1.0f), -glm::vec3(game.player.position / screenDim, 0.0f));
+		if (editor.active) {
+			shaderData.mvp = glm::translate(glm::mat4(1.0f), -glm::vec3(glm::vec2(editor.pos) / screenDim, 0.0f));
+		} else {
+			shaderData.mvp = glm::translate(glm::mat4(1.0f), -glm::vec3(game.player.position / screenDim, 0.0f));
+		}
 		shaderData.mvp *= glm::ortho(-screenDim.x, screenDim.x, -screenDim.x, screenDim.x);
 		shaderData.screenRes = glm::vec2((float)width, (float)height);
 		shaderData.lightCount = currentFrame.lightsBufferDrawCount;
@@ -1697,6 +1768,14 @@ public:
 		ImGui::Text("%.2f ms/frame (%.1d fps)", (1000.0f / lastFPS), lastFPS);
 		ImGui::End();
 
+		ImGui::Begin("Editor");
+		if (ImGui::Button("Toggle")) {
+			editor.active = !editor.active;
+		}
+		if (ImGui::Button("Save")) {
+			game.tilemap.save("tilemap.bin");
+		}
+		ImGui::End();
 		ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiSetCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ImVec2(0, 50), ImGuiSetCond_FirstUseEver);
 		ImGui::Begin("Player");
