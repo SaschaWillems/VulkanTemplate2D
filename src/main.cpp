@@ -1642,7 +1642,12 @@ public:
 		// Post process
 		cb->bindDescriptorSets(pipelineLayouts["postprocess"], { frame.descriptorSet, descriptorSetRenderImage, frame.descriptorSetLights });
 		cb->bindPipeline(pipelines["postprocess"]);
-		cb->updatePushConstant(pipelineLayouts["postprocess"], 0, &postProcessEffect);
+		if (editor.active) {
+			const uint32_t pc = 999;
+			cb->updatePushConstant(pipelineLayouts["postprocess"], 0, &pc);
+		} else {
+			cb->updatePushConstant(pipelineLayouts["postprocess"], 0, &postProcessEffect);
+		}
 		cb->draw(3, 1, 0, 0);
 
 		// Backdrop

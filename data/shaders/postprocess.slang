@@ -76,6 +76,11 @@ VSOutput main(uint VertexIndex : SV_VertexID)
 [shader("fragment")]
 float4 main(VSOutput input, uniform int effect)
 {
+    // No effects in editor mode
+    if (effect == 999) {
+        return inputImage.Sample(input.UV);
+    }
+
     // CRT curvature
     float2 uv = curveRemapUV(input.UV);
 
