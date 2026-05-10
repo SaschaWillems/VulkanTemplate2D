@@ -951,8 +951,8 @@ public:
 				.map = true,
 			});
 			frame.uiTextBufferSize = textVertexBufferSize;
-			frame.uiTextBufferVertexCount = static_cast<uint32_t>(tv.size());
 		}
+		frame.uiTextBufferVertexCount = static_cast<uint32_t>(tv.size());
 		memcpy(frame.uiTextBuffer->mapped, tv.data(), textVertexBufferSize);
 	}
 
