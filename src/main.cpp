@@ -6,6 +6,7 @@
 
 #include "VulkanContext.h"
 #include "FileWatcher.hpp"
+#include <filesystem>
 #include <VulkanApplication.h>
 #include "AudioManager.h"
 #include "Texture.hpp"
@@ -75,7 +76,7 @@ struct TilemapInstanceData {
 	IV2 pos;
 	// @todo: smaller data type
 	uint32_t imageIndex{ 0 };
-	// uint32_t effect{ 0 };
+	uint32_t effect{ 0 };
 };
 
 struct LightSource {
@@ -362,6 +363,7 @@ public:
 	void loadAssets() {		
 		game.monsterTypes.loadFromFile(getAssetPath() + "game/monsters.json");
 		// @todo
+		const std::string tileSet{ "set0" };
 		for (auto& set : game.monsterTypes.sets) {
 			for (auto& type : set.types) {
 				loadTexture(getAssetPath() + "game/monsters/" + type.image, type.imageIndex);
@@ -386,14 +388,22 @@ public:
 		loadTexture(getAssetPath() + "game/projectiles/magic_bolt_4.png", game.projectileImageIndexMonster);
 		loadTexture(getAssetPath() + "game/pickups/misc_crystal_old.png", game.experienceImageIndex);
 
-		// @todo: tile map
-		const std::string tileSet{ "set0" };
-		uint32_t dummyIdx;
-		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/empty.png");
+		// Tile map
+		game.tilemap.firstTileIndex = static_cast<uint32_t>(textures.size());
+		for (const auto& file : std::filesystem::directory_iterator(getAssetPath() + "game/tiles/" + tileSet)) {
+			if (file.path().extension() == ".png") {
+				loadTexture(file.path().string());
+			}
+		}
+		game.tilemap.lastTileIndex = static_cast<uint32_t>(textures.size());
+
+		/*
 		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/floor00.png", game.tilemap.firstTileIndex);
 		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/floor01.png", game.tilemap.lastTileIndex);
 		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/floor02.png", game.tilemap.lastTileIndex);
 		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/water.png", game.tilemap.lastTileIndex);
+		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/empty.png", game.tilemap.lastTileIndex);
+		*/
 		loadTexture(getAssetPath() + "game/crtframe.png", crtFrameImageIndex);
 
 		// Game UI
