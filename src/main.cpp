@@ -396,14 +396,7 @@ public:
 			}
 		}
 		game.tilemap.lastTileIndex = static_cast<uint32_t>(textures.size());
-
-		/*
-		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/floor00.png", game.tilemap.firstTileIndex);
-		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/floor01.png", game.tilemap.lastTileIndex);
-		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/floor02.png", game.tilemap.lastTileIndex);
-		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/water.png", game.tilemap.lastTileIndex);
-		loadTexture(getAssetPath() + "game/tiles/" + tileSet + "/empty.png", game.tilemap.lastTileIndex);
-		*/
+		
 		loadTexture(getAssetPath() + "game/crtframe.png", crtFrameImageIndex);
 
 		// Game UI
@@ -1802,13 +1795,14 @@ public:
 		if (ImGui::Button("Save")) {
 			game.tilemap.save("tilemap.bin");
 		}
+		if (ImGui::Button("Load")) {
+			game.tilemap.load("tilemap.bin");
+		}
 		ImGui::End();
 		ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiSetCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ImVec2(0, 50), ImGuiSetCond_FirstUseEver);
 		ImGui::Begin("Player");
 		ImGui::Text("Pos: %.2f / %.2f", game.player.position.x, game.player.position.y);
-		glm::ivec2 tilePos = game.tilemap.tilePosFromVisualPos(game.player.position + 0.5f);
-		ImGui::Text("Tile: %d / %d", tilePos.x, tilePos.y);
 		ImGui::Text("XP: %.2f / %d", game.player.experience, game.getNextLevelExp(game.player.level + 1));
 		ImGui::Text("Level: %d", game.player.level);
 		ImGui::Text("Crit chance: %.1f", game.player.criticalChance);

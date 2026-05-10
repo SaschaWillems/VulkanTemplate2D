@@ -7,6 +7,8 @@
 #pragma once
 
 #include <stdint.h>
+#include <iostream>
+#include <fstream>
 #include "Texture.hpp"
 #include "Sampler.hpp"
 #include "DescriptorSet.hpp"
@@ -20,7 +22,6 @@ namespace Game {
 	public:
 		// @todo: multiple layers? (background/foreground)
 		uint32_t data[TILEMAP_MAX_DIM][TILEMAP_MAX_DIM];
-		uint32_t imageIndex;
 		uint32_t firstTileIndex;
 		uint32_t lastTileIndex;
 		uint32_t width{ TILEMAP_MAX_DIM };
@@ -29,6 +30,7 @@ namespace Game {
 		glm::vec2 screenFactor{ 0.0f };
 		~Tilemap();
 		void setSize(uint32_t width, uint32_t height);
-		glm::ivec2 tilePosFromVisualPos(glm::vec2 visualPos) const;
+		void save(const std::string filename);
+		void load(const std::string filename);
 	};
 }
