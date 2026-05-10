@@ -572,6 +572,22 @@ public:
 				frame.tilemapInstanceCount++;
 			}
 		}
+
+		// In editor mode we want to show tiles that can be selected
+		if (editor.active) {
+			for (int32_t i = -3; i <= 3; i++) {
+				int32_t sidx = (int32_t)editor.tileIndex + i;
+				if (sidx < 0  || sidx > (game.tilemap.lastTileIndex - game.tilemap.firstTileIndex)) {
+					continue;
+				}
+				tilemapInstances[frame.tilemapInstanceCount] = {
+					.pos = {.x = ((uint32_t)sx + (ex - sx) / 2) + i, .y = currentTilePos.y + (uint32_t)(screenDim.y * 0.85)},
+					.imageIndex = (uint32_t)i + game.tilemap.firstTileIndex + editor.tileIndex,
+					.effect = (uint32_t)((i == 0) ? 1 : 2)
+				};
+				frame.tilemapInstanceCount++;
+			}
+		}
 #if defined(USE_REBAR)
 		memcpy(frame.tilemapInstanceBuffer->mapped, &tilemapInstances[0], frame.tilemapInstanceCount * sizeof(TilemapInstanceData));
 #endif
@@ -1057,8 +1073,8 @@ public:
 				// Instanced
 				{ .location = 2, .binding = 1, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(InstanceData, pos) },
 				{ .location = 3, .binding = 1, .format = VK_FORMAT_R32_SFLOAT, .offset = offsetof(InstanceData, scale) },
-				{ .location = 4, .binding = 1, .format = VK_FORMAT_R32_SINT, .offset = offsetof(InstanceData, imageIndex) },
-				{ .location = 5, .binding = 1, .format = VK_FORMAT_R32_SINT, .offset = offsetof(InstanceData, effect) },
+				{ .location = 4, .binding = 1, .format = VK_FORMAT_R32_UINT, .offset = offsetof(InstanceData, imageIndex) },
+				{ .location = 5, .binding = 1, .format = VK_FORMAT_R32_UINT, .offset = offsetof(InstanceData, effect) },
 			}
 		};
 
@@ -1127,7 +1143,8 @@ public:
 				{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vertex, uv) },
 				// Instanced
 				{.location = 2, .binding = 1, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(TilemapInstanceData, pos) },
-				{.location = 3, .binding = 1, .format = VK_FORMAT_R32_SINT, .offset = offsetof(TilemapInstanceData, imageIndex) },
+				{.location = 3, .binding = 1, .format = VK_FORMAT_R32_UINT, .offset = offsetof(TilemapInstanceData, imageIndex) },
+				{.location = 4, .binding = 1, .format = VK_FORMAT_R32_UINT, .offset = offsetof(TilemapInstanceData, effect) },
 			}
 		};
 
@@ -1683,7 +1700,7 @@ public:
 					direction.y = 1.0f;
 				}
 				if (kbDebounce > 0.0f) {
-					kbDebounce -= frameTimer * 15.0f;
+					kbDebounce -= frameTimer * 10.0f;
 				} else {
 					if (sf::Keyboard::isKeyPressed(sf::Keyboard::Subtract) && editor.tileIndex > 0) {
 						editor.tileIndex -= 1;
