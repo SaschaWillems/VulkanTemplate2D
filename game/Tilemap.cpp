@@ -28,7 +28,7 @@ void Game::Tilemap::save(const std::string filename)
 	std::fstream file;
 	file.open(filename, std::ios::trunc | std::ios::binary | std::fstream::out);
 	assert(file.is_open());
-	// @todo: proper header (incl. tileset name)
+	// @todo: proper header (incl. tileset name and version)
 	struct Header {
 		uint32_t width;
 		uint32_t height;
@@ -38,7 +38,8 @@ void Game::Tilemap::save(const std::string filename)
 		.height = TILEMAP_MAX_DIM
 	};
 	file.write((char*)&header, sizeof(Header));
-	file.write((char*)&data, TILEMAP_MAX_DIM * TILEMAP_MAX_DIM * sizeof(uint32_t));
+	file.write((char*)&backgroundLayer, TILEMAP_MAX_DIM * TILEMAP_MAX_DIM * sizeof(uint32_t));
+	file.write((char*)&foregroundLayer, TILEMAP_MAX_DIM* TILEMAP_MAX_DIM * sizeof(uint32_t));
 	file.close();
 }
 
@@ -47,12 +48,12 @@ void Game::Tilemap::load(const std::string filename)
 	std::fstream file;
 	file.open(filename, std::ios::binary | std::fstream::in);
 	assert(file.is_open());
-	// @todo: proper header (incl. tileset name)
 	struct Header {
 		uint32_t width;
 		uint32_t height;
 	} header{};
 	file.read((char*)&header, sizeof(Header));
-	file.read((char*)&data, TILEMAP_MAX_DIM * TILEMAP_MAX_DIM * sizeof(uint32_t));
+	file.read((char*)&backgroundLayer, TILEMAP_MAX_DIM * TILEMAP_MAX_DIM * sizeof(uint32_t));
+	//file.read((char*)&foregroundLayer, TILEMAP_MAX_DIM * TILEMAP_MAX_DIM * sizeof(uint32_t));
 	file.close();
 }

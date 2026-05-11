@@ -424,7 +424,7 @@ public:
 			audioManager->addSoundFile(it.first, getAssetPath() + it.second);
 		}
 	}
-	
+
 	void initTileMap()
 	{
 		auto& tilemap = game.tilemap;
@@ -435,15 +435,11 @@ public:
 			for (auto y = 0; y < TILEMAP_MAX_DIM; y++) {
 				// Border
 				if (y == 0 || y == TILEMAP_MAX_DIM - 1 || x == 0 || x == TILEMAP_MAX_DIM - 1) {
-					tilemap.data[x][y] = 3;
+					tilemap.backgroundLayer[x][y] = 0;
 					continue;
 				}
-				// @todo: testing
-				if (x % 16 == 0 && y % 16 == 0) {
-					tilemap.data[x][y] = 4;
-					continue;
-				}
-				tilemap.data[x][y] = rndTile(game.randomEngine);
+				tilemap.backgroundLayer[x][y] = 1;
+				tilemap.foregroundLayer[x][y] = -1;
 			}
 		}
 
@@ -570,7 +566,7 @@ public:
 				}
 				tilemapInstances[frame.tilemapInstanceCount] = {
 					.pos = {.x = (uint32_t)x, .y = (uint32_t)y },
-					.imageIndex = tilemap.data[x][y] + game.tilemap.firstTileIndex
+					.imageIndex = tilemap.backgroundLayer[x][y] + game.tilemap.firstTileIndex
 				};
 				frame.tilemapInstanceCount++;
 			}
