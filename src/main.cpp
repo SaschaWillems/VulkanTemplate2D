@@ -124,6 +124,7 @@ struct Editor {
 	glm::vec2 pos{ 0.0f };
 	glm::ivec2 selectedTile{ 0 };
 	uint32_t tileIndex{ 0 };
+	byte activeLayer{ 0 };
 } editor;
 
 class Application : public VulkanApplication {
@@ -1670,6 +1671,25 @@ public:
 		cb->end();
 	}
 
+	void handleEvent(sf::Event& event) {
+		if (event.type == sf::Event::KeyPressed) {
+			if (event.key.code == sf::Keyboard::F2) {
+				editor.active = !editor.active;
+			}
+			if (editor.active) {
+				if (event.key.code == sf::Keyboard::F3) {
+					editor.activeLayer = !editor.activeLayer;
+				}
+				if ((event.key.code == sf::Keyboard::Subtract) && editor.tileIndex > 0) {
+					editor.tileIndex -= 1;
+				}
+				if ((event.key.code == sf::Keyboard::Add) && (editor.tileIndex < game.tilemap.lastTileIndex - game.tilemap.firstTileIndex)) {
+					editor.tileIndex += 1;
+				}
+			}
+		}
+	}
+
 	void render() {
 		ZoneScoped;
 
@@ -1703,25 +1723,13 @@ public:
 				if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
 					direction.y = 1.0f;
 				}
-				if (kbDebounce > 0.0f) {
-					kbDebounce -= frameTimer * 10.0f;
-				} else {
-					if (sf::Keyboard::isKeyPressed(sf::Keyboard::Subtract) && editor.tileIndex > 0) {
-						editor.tileIndex -= 1;
-						kbDebounce = 1.0f;
-					}
-					if (sf::Keyboard::isKeyPressed(sf::Keyboard::Add) && editor.tileIndex < (game.tilemap.lastTileIndex - game.tilemap.firstTileIndex)) {
-						editor.tileIndex += 1;
-						kbDebounce = 1.0f;
-					}
-				}
 				editor.pos += direction * 25.0f * frameTimer;
 				auto mo = camera.mouse.cursorPosNDC - glm::vec2(0.5f);
 				mo *= glm::vec2(screenDim.x * 2.0f, screenDim.y * 2.0f);
 				editor.selectedTile = glm::ivec2(editor.pos + mo + glm::vec2(0.5));
 				if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
 					if (editor.selectedTile.x > -1 && editor.selectedTile.x < TILEMAP_MAX_DIM && editor.selectedTile.y > -1 && editor.selectedTile.y < TILEMAP_MAX_DIM) {
-						game.tilemap.data[editor.selectedTile.x][editor.selectedTile.y] = editor.tileIndex;
+						game.tilemap.backgroundLayer[editor.selectedTile.x][editor.selectedTile.y] = editor.tileIndex;
 					}
 				}
 			}
