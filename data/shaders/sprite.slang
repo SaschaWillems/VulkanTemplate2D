@@ -29,8 +29,8 @@ struct VSInput
     // Instanced attributes
     [[vk::location(2)]] float3 instancePos : POSITION1;
     [[vk::location(3)]] float instanceScale : POSITION2;
-    [[vk::location(4)]] int instanceTextureIndex : TEXCOORD3;
-    [[vk::location(5)]] int instanceEffect : TEXCOORD4;
+    [[vk::location(4)]] uint instanceTextureIndex : TEXCOORD3;
+    [[vk::location(5)]] uint instanceEffect : TEXCOORD4;
 };
 
 struct VSOutput

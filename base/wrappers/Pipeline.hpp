@@ -28,6 +28,12 @@ struct PipelineVertexInput {
 	std::vector<VkVertexInputAttributeDescription> attributes{};
 };
 
+struct PipelineSpecialization {
+	std::vector<VkSpecializationMapEntry> entries{};
+	size_t dataSize;
+	const void* data;
+};
+
 struct PipelineCreateInfo {
 	const std::string name{ "" };
 	VkPipelineBindPoint bindPoint{ VK_PIPELINE_BIND_POINT_GRAPHICS };
@@ -50,6 +56,7 @@ struct PipelineCreateInfo {
 	} blending;
 	std::vector<DynamicState> dynamicState{};
 	VkPipelineRenderingCreateInfo pipelineRenderingInfo{};
+	PipelineSpecialization specialization{};
 	bool enableHotReload{ false };
 };
 
@@ -138,6 +145,17 @@ private:
 		pipelineCI.pColorBlendState = &colorBlendState;
 		pipelineCI.pDynamicState = &dynamicState;
 		pipelineCI.pNext = &createInfo.pipelineRenderingInfo; // createInfo.pNext;
+
+		VkSpecializationInfo specializationInfo{};
+		if (createInfo.specialization.entries.size() > 0) {
+			specializationInfo.dataSize = sizeof(createInfo.specialization.dataSize);
+			specializationInfo.mapEntryCount = static_cast<uint32_t>(createInfo.specialization.entries.size());
+			specializationInfo.pMapEntries = createInfo.specialization.entries.data();
+			specializationInfo.pData = createInfo.specialization.data;
+			for (auto& stage : shaderStages) {
+				stage.pSpecializationInfo = &specializationInfo;
+			}
+		}
 
 		VK_CHECK_RESULT(vkCreateGraphicsPipelines(VulkanContext::device->logicalDevice, createInfo.cache, 1, &pipelineCI, nullptr, &handle));
 	

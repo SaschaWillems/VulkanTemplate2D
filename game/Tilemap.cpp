@@ -54,6 +54,6 @@ void Game::Tilemap::load(const std::string filename)
 	} header{};
 	file.read((char*)&header, sizeof(Header));
 	file.read((char*)&backgroundLayer, TILEMAP_MAX_DIM * TILEMAP_MAX_DIM * sizeof(uint32_t));
-	//file.read((char*)&foregroundLayer, TILEMAP_MAX_DIM * TILEMAP_MAX_DIM * sizeof(uint32_t));
+	file.read((char*)&foregroundLayer, TILEMAP_MAX_DIM * TILEMAP_MAX_DIM * sizeof(uint32_t));
 	file.close();
 }

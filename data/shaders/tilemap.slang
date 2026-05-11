@@ -27,9 +27,9 @@ struct VSInput
     [[vk::location(0)]] float3 pos : POSITION0;
     [[vk::location(1)]] float2 uv : TEXCOORD0;
     // Instanced attributes
-    [[vk::location(2)]] int2 instancePos;
-    [[vk::location(3)]] int instanceTextureIndex;
-    [[vk::location(4)]] int instanceEffect;
+    [[vk::location(2)]] uint2 instancePos;
+    [[vk::location(3)]] uint instanceTextureIndex;
+    [[vk::location(4)]] uint instanceEffect;
 };
 
 struct VSOutput
@@ -40,6 +40,8 @@ struct VSOutput
     [[vk::location(2)]] nointerpolation int textureIndex;
     [[vk::location(3)]] nointerpolation int instanceEffect;
 };
+
+[[SpecializationConstant]] const int TILEMAP_LAYER = 0;
 
 [shader("vertex")]
 VSOutput main(VSInput input, uniform int2 selectedTile)
@@ -61,6 +63,12 @@ VSOutput main(VSInput input, uniform int2 selectedTile)
 float4 main(VSOutput input) : SV_TARGET
 {
     float4 color = textures[input.textureIndex].Sample(samplers[0], input.uv);
+    if (TILEMAP_LAYER == 1) {
+        if (color.a < 0.5)
+        {
+            discard;
+        }
+    }
     if (input.instanceEffect == 1) {
         if (input.uv.x < 0.05 || input.uv.x > 0.95 || input.uv.y < 0.05 || input.uv.y > 0.95) {
             input.color = 100.0;
@@ -70,5 +78,6 @@ float4 main(VSOutput input) : SV_TARGET
             input.color = 0.0;
         }
     }
+    // Use effect to mirror?
     return color * input.color;
 }

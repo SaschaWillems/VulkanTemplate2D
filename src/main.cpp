@@ -159,6 +159,7 @@ private:
 		// @todo: Tilemap rendering
 		uint32_t tilemapInstanceCount{ 0 };
 		Buffer* tilemapInstanceBuffer{ nullptr };
+		uint32_t tilemapForegroundInstanceCount{ 0 };
 		// @todo: Separate projectiles into own set of instance buffers (due to different update frequency?)
 		//struct Projectiles {
 		//	Buffer* instanceBuffer{ nullptr };
@@ -542,7 +543,8 @@ public:
 		Game::Tilemap& tilemap = game.tilemap;
 
 		if (!tilemapInstances) {
-			tilemapInstances = new TilemapInstanceData[TILEMAP_MAX_DIM * TILEMAP_MAX_DIM];
+			// @todo: no need to be that big...
+			tilemapInstances = new TilemapInstanceData[TILEMAP_MAX_DIM * TILEMAP_MAX_DIM * 2];
 		}
 
 		if (!frame.tilemapInstanceBuffer) {
@@ -560,6 +562,7 @@ public:
 		int32_t ex = currentTilePos.x + (int32_t)(screenDim.x * 1.25f);
 		int32_t sy = currentTilePos.y - (int32_t)(screenDim.y * 1.25f);
 		int32_t ey = currentTilePos.y + (int32_t)(screenDim.y * 1.25f);
+		// Background
 		for (int32_t y = sy; y <= ey; y++) {
 			for (int32_t x = sx; x <= ex; x++) {
 				if ((x < 0) || (y < 0) || (x > TILEMAP_MAX_DIM - 1) || (y > TILEMAP_MAX_DIM - 1)) {
@@ -577,7 +580,7 @@ public:
 		if (editor.active) {
 			for (int32_t i = -3; i <= 3; i++) {
 				int32_t sidx = (int32_t)editor.tileIndex + i;
-				if (sidx < 0  || sidx > (game.tilemap.lastTileIndex - game.tilemap.firstTileIndex)) {
+				if (sidx < 0 || sidx >(game.tilemap.lastTileIndex - game.tilemap.firstTileIndex)) {
 					continue;
 				}
 				tilemapInstances[frame.tilemapInstanceCount] = {
@@ -588,8 +591,27 @@ public:
 				frame.tilemapInstanceCount++;
 			}
 		}
+
+		// Foreground
+		frame.tilemapForegroundInstanceCount = 0;
+		for (int32_t y = sy; y <= ey; y++) {
+			for (int32_t x = sx; x <= ex; x++) {
+				if ((x < 0) || (y < 0) || (x > TILEMAP_MAX_DIM - 1) || (y > TILEMAP_MAX_DIM - 1)) {
+					continue;
+				}
+				if (tilemap.foregroundLayer[x][y] == -1) {
+					continue;
+				}
+				tilemapInstances[frame.tilemapInstanceCount + frame.tilemapForegroundInstanceCount] = {
+					.pos = {.x = (uint32_t)x, .y = (uint32_t)y },
+					.imageIndex = tilemap.foregroundLayer[x][y] + game.tilemap.firstTileIndex
+				};
+				frame.tilemapForegroundInstanceCount++;
+			}
+		}
+
 #if defined(USE_REBAR)
-		memcpy(frame.tilemapInstanceBuffer->mapped, &tilemapInstances[0], frame.tilemapInstanceCount * sizeof(TilemapInstanceData));
+		memcpy(frame.tilemapInstanceBuffer->mapped, &tilemapInstances[0], (frame.tilemapInstanceCount + frame.tilemapForegroundInstanceCount ) * sizeof(TilemapInstanceData));
 #endif
 	}
 
@@ -892,10 +914,14 @@ public:
 		if (editor.active) {
 			ui.textElements.push_back({
 				.pos = glm::vec2(0.0f, 0.35f),
-				.text = "Editor mode enabled"
+				.text = "Editor mode enabled (Toggle with F2)"
 			});
 			ui.textElements.push_back({
 				.pos = glm::vec2(0.0f, 0.4f),
+				.text = std::format("Layer: {} (Toggle with F3)", editor.activeLayer)
+			});
+			ui.textElements.push_back({
+				.pos = glm::vec2(0.0f, 0.45f),
 				.text = std::format("Tileindex: {}", editor.tileIndex)
 			});
 		}
@@ -1142,7 +1168,7 @@ public:
 				{.location = 0, .binding = 0, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(Vertex, pos) },
 				{.location = 1, .binding = 0, .format = VK_FORMAT_R32G32_SFLOAT, .offset = offsetof(Vertex, uv) },
 				// Instanced
-				{.location = 2, .binding = 1, .format = VK_FORMAT_R32G32B32_SFLOAT, .offset = offsetof(TilemapInstanceData, pos) },
+				{.location = 2, .binding = 1, .format = VK_FORMAT_R32G32_UINT, .offset = offsetof(TilemapInstanceData, pos) },
 				{.location = 3, .binding = 1, .format = VK_FORMAT_R32_UINT, .offset = offsetof(TilemapInstanceData, imageIndex) },
 				{.location = 4, .binding = 1, .format = VK_FORMAT_R32_UINT, .offset = offsetof(TilemapInstanceData, effect) },
 			}
@@ -1193,6 +1219,61 @@ public:
 			.enableHotReload = true
 			});
 		pipelineList.push_back(pipelines["tilemap"]);
+		const uint32_t layerIndex = 1;
+		pipelines["tilemap_foreground"] = new Pipeline({
+			.shaders = {
+				.filename = getAssetPath() + "shaders/tilemap.slang",
+				.stages = { VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT }
+			},
+			.cache = pipelineCache,
+			.layout = *pipelineLayouts["tilemap"],
+			.vertexInput = vertexInput,
+			.inputAssemblyState = {
+				.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+			},
+			.viewportState = {
+				.viewportCount = 1,
+				.scissorCount = 1
+			},
+			.rasterizationState = {
+				.polygonMode = VK_POLYGON_MODE_FILL,
+				.cullMode = VK_CULL_MODE_BACK_BIT,
+				.frontFace = VK_FRONT_FACE_CLOCKWISE,
+				.lineWidth = 1.0f
+			},
+			.multisampleState = {
+				.rasterizationSamples = settings.sampleCount,
+			},
+			.depthStencilState = {
+				.depthTestEnable = VK_FALSE,
+				.depthWriteEnable = VK_FALSE,
+				.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+			},
+			.blending = {
+				.attachments = { blendAttachmentState }
+			},
+			.dynamicState = {
+				DynamicState::Scissor,
+				DynamicState::Viewport
+			},
+			.pipelineRenderingInfo = {
+				.colorAttachmentCount = 1,
+				.pColorAttachmentFormats = &swapChain->colorFormat,
+				.depthAttachmentFormat = depthFormat,
+				.stencilAttachmentFormat = depthFormat
+			},
+			.specialization = {
+				.entries = {
+					VkSpecializationMapEntry { .constantID = 0, .size = sizeof(uint32_t) },
+				},
+				.dataSize = sizeof(uint32_t),
+				.data = &layerIndex
+			},
+			.enableHotReload = true
+		});
+		pipelineList.push_back(pipelines["tilemap_foreground"]);
+
+
 		// CRT frame
 		VkPipelineColorBlendAttachmentState blendAttachmentStateEnabled{
 			.blendEnable = VK_TRUE,
@@ -1593,6 +1674,11 @@ public:
 		cb->updatePushConstant(pipelineLayouts["tilemap"], 0, &selectedTile);
 		cb->bindPipeline(pipelines["tilemap"]);
 		cb->draw(6, frame.tilemapInstanceCount, 0, 0);
+		if (frame.tilemapForegroundInstanceCount > 0) {
+			cb->bindPipeline(pipelines["tilemap_foreground"]);
+			cb->bindVertexBuffers(1, 1, { frame.tilemapInstanceBuffer->buffer }, { frame.tilemapInstanceCount * sizeof(TilemapInstanceData) });
+			cb->draw(6, frame.tilemapForegroundInstanceCount, 0, 0);
+		}
 
 		// Draw sprites using instancing
 		// Instancing buffer stores sprite index, position, scale, direction (to flip/rotate) uv, maybe color for health state
