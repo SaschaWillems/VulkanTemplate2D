@@ -268,52 +268,25 @@ public:
 	void handleEvent(const xcb_generic_event_t *event);
 #endif
 	virtual VkResult createInstance();
-
-	// Pure virtual render function (override in derived class)
 	virtual void render() = 0;
-	// Called when view change occurs
-	// Can be overriden in derived class to e.g. update uniform buffers 
-	// Containing view dependant matrices
 	virtual void viewChanged();
-	/** @brief (Virtual) Called after a key was pressed, can be used to do custom key handling */
 	virtual void keyPressed(uint32_t);
-	/** @brief (Virtual) Called after th mouse cursor moved and before internal events (like camera rotation) is handled */
 	virtual void mouseMoved(double x, double y, bool &handled);
-	// Called when the window has been resized
-	// Can be overriden in derived class to recreate or rebuild resources attached to the frame buffer / swapchain
+	virtual void handleEvent(sf::Event& event);
 	virtual void windowResized();
-
-	// Setup default depth and stencil views
 	virtual void setupDepthStencil();
-	// Create framebuffers for all requested swap chain images
-	// Can be overriden in derived class to setup a custom framebuffer (e.g. for MSAA)
 	virtual void setupImages();
-
-	// Connect and prepare the swap chain
 	void initSwapchain();
-
-	// Prepare commonly used Vulkan functions
 	virtual void prepare();
-
-	// Start the main render loop
 	void renderLoop();
-
-	// Render one frame of a render loop on platforms that sync rendering
 	void renderFrame();
-
 	void updateOverlay(uint32_t frameIndex);
-
 	void nextFrame();
-
-	/** @brief (Virtual) Called when the UI overlay is updating, can be used to add custom elements to the overlay */
 	virtual void OnUpdateOverlay(vks::UIOverlay& overlay);
-
-	// @todo: Functions for reworked proper sync and per-frame resources
 	void prepareFrame(VulkanFrameObjects& frame);
 	void submitFrame(VulkanFrameObjects& frame);
 	uint32_t getFrameCount();
 	uint32_t getCurrentFrameIndex();
-
 	void createBaseFrameObjects(VulkanFrameObjects& frame);
 	void destroyBaseFrameObjects(VulkanFrameObjects& frame);
 };

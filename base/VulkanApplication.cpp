@@ -260,6 +260,8 @@ void VulkanApplication::renderLoop()
 		sf::Event event;
 		while (window->pollEvent(event))
 		{
+			// @todo: skip if handled by app?
+			handleEvent(event);
 			if (event.type == sf::Event::Closed) {
 				window->close();
 				return;
@@ -1625,6 +1627,8 @@ void VulkanApplication::viewChanged() {}
 void VulkanApplication::keyPressed(uint32_t) {}
 
 void VulkanApplication::mouseMoved(double x, double y, bool & handled) {}
+
+void VulkanApplication::handleEvent(sf::Event& event) {}
 
 void VulkanApplication::setupDepthStencil()
 {
