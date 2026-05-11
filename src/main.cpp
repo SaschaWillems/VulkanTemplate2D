@@ -542,15 +542,17 @@ public:
 	void updateTileMap(FrameObjects& frame) {
 		Game::Tilemap& tilemap = game.tilemap;
 
+		const size_t maxInstanceBufferDim = TILEMAP_MAX_DIM * TILEMAP_MAX_DIM + TILEMAP_MAX_DIM * TILEMAP_MAX_DIM;
+
 		if (!tilemapInstances) {
 			// @todo: no need to be that big...
-			tilemapInstances = new TilemapInstanceData[TILEMAP_MAX_DIM * TILEMAP_MAX_DIM * 2];
+			tilemapInstances = new TilemapInstanceData[maxInstanceBufferDim];
 		}
 
 		if (!frame.tilemapInstanceBuffer) {
 			frame.tilemapInstanceBuffer = new Buffer({
 				.usageFlags = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-				.size = TILEMAP_MAX_DIM * TILEMAP_MAX_DIM * sizeof(TilemapInstanceData),
+				.size = maxInstanceBufferDim * sizeof(TilemapInstanceData),
 				.vmaAllocFlags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT,
 				.map = true,
 			});
@@ -1669,7 +1671,8 @@ public:
 		if (editor.active) {
 			selectedTile = editor.selectedTile;
 		} else {
-			selectedTile = game.player.tilePos();
+			selectedTile = { -1, -1 };
+			//selectedTile = game.player.tilePos();
 		}
 		cb->updatePushConstant(pipelineLayouts["tilemap"], 0, &selectedTile);
 		cb->bindPipeline(pipelines["tilemap"]);
@@ -1772,6 +1775,12 @@ public:
 				if ((event.key.code == sf::Keyboard::Add) && (editor.tileIndex < game.tilemap.lastTileIndex - game.tilemap.firstTileIndex)) {
 					editor.tileIndex += 1;
 				}
+			}
+		}
+		if (event.type == sf::Event::MouseWheelScrolled) {
+			if (editor.active) {
+				screenDim.x *= 1.0 - ((float)event.mouseWheelScroll.delta * 0.1);
+				screenDim.y *= 1.0 - ((float)event.mouseWheelScroll.delta * 0.1);
 			}
 		}
 	}
