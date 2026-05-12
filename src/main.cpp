@@ -1685,12 +1685,14 @@ public:
 
 		// Draw sprites using instancing
 		// Instancing buffer stores sprite index, position, scale, direction (to flip/rotate) uv, maybe color for health state
+		if (!editor.active) {
+			cb->bindVertexBuffers(0, 1, { quadBuffer->buffer });
+			cb->bindVertexBuffers(1, 1, { frame.instanceBuffer->buffer });
+			cb->bindDescriptorSets(pipelineLayouts["sprite"], { descriptorSetTextures, descriptorSetSamplers, frame.descriptorSet });
+			cb->bindPipeline(pipelines["sprite"]);
+			cb->draw(6, frame.instanceBufferDrawCount, 0, 0);
+		}
 
-		cb->bindVertexBuffers(0, 1, { quadBuffer->buffer });
-		cb->bindVertexBuffers(1, 1, { frame.instanceBuffer->buffer });
-		cb->bindDescriptorSets(pipelineLayouts["sprite"], { descriptorSetTextures, descriptorSetSamplers, frame.descriptorSet });
-		cb->bindPipeline(pipelines["sprite"]);
-		cb->draw(6, frame.instanceBufferDrawCount, 0, 0);		
 		// Game overlay
 		// @todo: before or after post process?
 		cb->bindVertexBuffers(0, 1, { frame.uiBuffer->buffer });
@@ -1769,11 +1771,16 @@ public:
 				if (event.key.code == sf::Keyboard::F3) {
 					editor.activeLayer = !editor.activeLayer;
 				}
-				if ((event.key.code == sf::Keyboard::Subtract) && editor.tileIndex > 0) {
+				if ((event.key.code == sf::Keyboard::Subtract) && (editor.tileIndex > 0)) {
 					editor.tileIndex -= 1;
 				}
 				if ((event.key.code == sf::Keyboard::Add) && (editor.tileIndex < game.tilemap.lastTileIndex - game.tilemap.firstTileIndex)) {
 					editor.tileIndex += 1;
+				}
+				if ((event.key.code == sf::Keyboard::Delete) && (editor.activeLayer == 1)) {
+					if (editor.selectedTile.x > -1 && editor.selectedTile.x < TILEMAP_MAX_DIM && editor.selectedTile.y > -1 && editor.selectedTile.y < TILEMAP_MAX_DIM) {
+						game.tilemap.foregroundLayer[editor.selectedTile.x][editor.selectedTile.y] = -1;
+					};
 				}
 			}
 		}
