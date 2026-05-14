@@ -698,13 +698,40 @@ void Game::Game::updateInput(float delta)
 	// @todo: proper collision check and use velocity
 	if (glm::length(player.direction) != 0.0f) {
 		glm::vec2 newPlayerPos = player.position + player.direction * playerSpeed * delta;
+		glm::ivec2 newTilePos = glm::ivec2{ (int)(floor(newPlayerPos.x + 0.5f)), (int)(floor(newPlayerPos.y + 0.5f)) };
+		glm::ivec2 playerTilePos = player.tilePos();
 		bool move = true;
 		// Bounds check
-		if (newPlayerPos.x < 0.0f || newPlayerPos.y < 0.0f) {
+		if ((newTilePos.x < 0) || (newTilePos.y < 0) || (newTilePos.y >= (tilemap.height - 1)) || (newTilePos.x >= (tilemap.width - 1))) {
 			move = false;
 		}
-		if ((newPlayerPos.y > (tilemap.height - 1) / tilemap.screenFactor.y) || (newPlayerPos.x > (tilemap.width - 1) / tilemap.screenFactor.x)) {
-			move = false;
+		// Foreground collision
+		// Check AABB corners of player
+		const float boxDim = (player.scale / 2.0f) * 0.85f;
+		glm::vec2 AABB[4] = {
+			glm::vec2(newPlayerPos.x - boxDim, newPlayerPos.y - boxDim),
+			glm::vec2(newPlayerPos.x + boxDim, newPlayerPos.y - boxDim),
+			glm::vec2(newPlayerPos.x + boxDim, newPlayerPos.y + boxDim),
+			glm::vec2(newPlayerPos.x - boxDim, newPlayerPos.y + boxDim),
+		};
+
+		const int32_t collRange = 2;
+		int32_t sx = playerTilePos.x - collRange;
+		int32_t ex = playerTilePos.x + collRange;
+		int32_t sy = playerTilePos.y - collRange;
+		int32_t ey = playerTilePos.y + collRange;
+		for (auto& p : AABB) {
+			for (int32_t y = sy; y <= ey; y++) {
+				for (int32_t x = sx; x <= ex; x++) {
+					glm::ivec2 chkTilePos = glm::vec2((int)round(p.x), (int)round(p.y));
+					if ((chkTilePos.x < 0) || (chkTilePos.y < 0) || (chkTilePos.x > TILEMAP_MAX_DIM - 1) || (chkTilePos.y > TILEMAP_MAX_DIM - 1)) {
+						continue;
+					}
+					if (tilemap.foregroundLayer[chkTilePos.x][chkTilePos.y] != UINT32_MAX) {
+						move = false;
+					}
+				}
+			}
 		}
 		if (move) {
 			player.position = newPlayerPos;
