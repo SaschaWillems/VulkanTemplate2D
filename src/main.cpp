@@ -125,6 +125,7 @@ struct Editor {
 	glm::ivec2 selectedTile{ 0 };
 	uint32_t tileIndex{ 0 };
 	byte activeLayer{ 0 };
+	bool foregroundVisible{ true };
 } editor;
 
 class Application : public VulkanApplication {
@@ -596,19 +597,21 @@ public:
 
 		// Foreground
 		frame.tilemapForegroundInstanceCount = 0;
-		for (int32_t y = sy; y <= ey; y++) {
-			for (int32_t x = sx; x <= ex; x++) {
-				if ((x < 0) || (y < 0) || (x > TILEMAP_MAX_DIM - 1) || (y > TILEMAP_MAX_DIM - 1)) {
-					continue;
+		if (!editor.active || (editor.active && editor.foregroundVisible)) {
+			for (int32_t y = sy; y <= ey; y++) {
+				for (int32_t x = sx; x <= ex; x++) {
+					if ((x < 0) || (y < 0) || (x > TILEMAP_MAX_DIM - 1) || (y > TILEMAP_MAX_DIM - 1)) {
+						continue;
+					}
+					if (tilemap.foregroundLayer[x][y] == -1) {
+						continue;
+					}
+					tilemapInstances[frame.tilemapInstanceCount + frame.tilemapForegroundInstanceCount] = {
+						.pos = {.x = (uint32_t)x, .y = (uint32_t)y },
+						.imageIndex = tilemap.foregroundLayer[x][y] + game.tilemap.firstTileIndex
+					};
+					frame.tilemapForegroundInstanceCount++;
 				}
-				if (tilemap.foregroundLayer[x][y] == -1) {
-					continue;
-				}
-				tilemapInstances[frame.tilemapInstanceCount + frame.tilemapForegroundInstanceCount] = {
-					.pos = {.x = (uint32_t)x, .y = (uint32_t)y },
-					.imageIndex = tilemap.foregroundLayer[x][y] + game.tilemap.firstTileIndex
-				};
-				frame.tilemapForegroundInstanceCount++;
 			}
 		}
 
@@ -1829,9 +1832,16 @@ public:
 				auto mo = camera.mouse.cursorPosNDC - glm::vec2(0.5f);
 				mo *= glm::vec2(screenDim.x * 2.0f, screenDim.y * 2.0f);
 				editor.selectedTile = glm::ivec2(editor.pos + mo + glm::vec2(0.5));
-				if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
+				if ((!overlay->visible) && sf::Mouse::isButtonPressed(sf::Mouse::Button::Left)) {
 					if (editor.selectedTile.x > -1 && editor.selectedTile.x < TILEMAP_MAX_DIM && editor.selectedTile.y > -1 && editor.selectedTile.y < TILEMAP_MAX_DIM) {
-						game.tilemap.backgroundLayer[editor.selectedTile.x][editor.selectedTile.y] = editor.tileIndex;
+						switch (editor.activeLayer) {
+						case 0:
+							game.tilemap.backgroundLayer[editor.selectedTile.x][editor.selectedTile.y] = editor.tileIndex;
+							break;
+						case 1:
+							game.tilemap.foregroundLayer[editor.selectedTile.x][editor.selectedTile.y] = editor.tileIndex;
+							break;
+						}
 					}
 				}
 			}
