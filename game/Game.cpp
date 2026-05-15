@@ -557,7 +557,7 @@ void Game::Game::update(float delta)
 			}
 		});
 
-		threadPool.threads[1]->addJob([=] { 
+		threadPool.threads[1]->addJob([=] {
 			for (auto i = 0; i < projectiles.size(); i++) {
 				Entities::Projectile& projectile = projectiles[i];
 				// @todo: update function
@@ -569,6 +569,11 @@ void Game::Game::update(float delta)
 				projectile.life -= delta * 50.0f;
 				if (projectile.life <= 0.0f) {
 					projectile.state = Entities::State::Dead;
+				} else {
+					glm::ivec2 tilePos = glm::ivec2{ (int)(round(projectile.position.x)), (int)(round(projectile.position.y)) };
+					if (tilePos.x < 0 || tilePos.y < 0 || tilePos.x > TILEMAP_MAX_DIM || tilePos.y > TILEMAP_MAX_DIM || (tilemap.foregroundLayer[tilePos.x][tilePos.y] != UINT32_MAX)) {
+						projectile.state = Entities::State::Dead;
+					}
 				}
 			}
 		});
