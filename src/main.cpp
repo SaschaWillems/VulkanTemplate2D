@@ -767,7 +767,7 @@ public:
 				.vmaAllocFlags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT,
 				.map = true,
 #endif
-				});
+			});
 #if defined(USE_REBAR)
 			VkMemoryPropertyFlags memPropFlags;
 			vmaGetAllocationMemoryProperties(VulkanContext::vmaAllocator, frame.lightsBuffer->bufferAllocation, &memPropFlags);
@@ -797,7 +797,10 @@ public:
 			frame.lights[lightIndex++] = {
 				.pos = lPos,
 				.color = projectile.lightColor,
-				.radius = 0.04f,
+				.radius = 0.04f * (screenDimBase.x / screenDim.x)
+			};
+		}
+		
 			};
 		}
 
