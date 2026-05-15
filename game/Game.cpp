@@ -615,60 +615,48 @@ void Game::Game::update(float delta)
 						monsterSpawnPosition(monster);
 					};
 					monster.visible = glm::length(player.position - monster.position) < std::max(playFieldSize.x, playFieldSize.y) * 1.5f;
-
 					monster.direction = glm::normalize(player.position - monster.position);
 					monster.velocity += monster.direction * monster.speed * 0.01f;
+
 					if (glm::length(monster.direction) > 0.0f) {
 						if (glm::length(monster.velocity) > 0.1f) {
-							glm::vec2 newMonsterPos = monster.position + monster.velocity * delta * 100.0f;
-
-							// @todo: Only cancel movement in blocked direction (so monters won't get stuck along walls)
-							bool move = true;
-							// Foreground collision
-							// Check AABB corners of player
-							const float boxDim = (player.scale / 2.0f) * 0.85f;
-							glm::vec2 AABB[4] = {
-								glm::vec2(newMonsterPos.x - boxDim, newMonsterPos.y - boxDim),
-								glm::vec2(newMonsterPos.x + boxDim, newMonsterPos.y - boxDim),
-								glm::vec2(newMonsterPos.x + boxDim, newMonsterPos.y + boxDim),
-								glm::vec2(newMonsterPos.x - boxDim, newMonsterPos.y + boxDim),
-							};
-
-							glm::ivec2 monsterTilePos = monster.tilePos();
-							const int32_t collRange = 2;
-							int32_t sx = monsterTilePos.x - collRange;
-							int32_t ex = monsterTilePos.x + collRange;
-							int32_t sy = monsterTilePos.y - collRange;
-							int32_t ey = monsterTilePos.y + collRange;
-							bool cancelX = false;
-							bool cancelY = false;
-							for (auto& p : AABB) {
-								for (int32_t y = sy; y <= ey; y++) {
-									for (int32_t x = sx; x <= ex; x++) {
-										glm::ivec2 chkTilePos = glm::vec2((int)round(p.x), (int)round(p.y));
-										if ((chkTilePos.x < 0) || (chkTilePos.y < 0) || (chkTilePos.x > TILEMAP_MAX_DIM - 1) || (chkTilePos.y > TILEMAP_MAX_DIM - 1)) {
-											continue;
-										}
-										// Only cancel in colliding direction
-										if (tilemap.foregroundLayer[chkTilePos.x][monsterTilePos.y] != UINT32_MAX) {
-											cancelX = true;
-										}
-										if (tilemap.foregroundLayer[monsterTilePos.x][chkTilePos.y] != UINT32_MAX) {
-											cancelY = true;
+							glm::ivec2 currTilePos = monster.tilePos();
+							glm::vec2 newPos = monster.position + monster.velocity * delta * 100.0f;
+							glm::ivec2 newTilePos = glm::ivec2{ (int)(floor(newPos.x + 0.5f)), (int)(floor(newPos.y + 0.5f)) };
+							if ((newTilePos.x >= 0) && (newTilePos.y >= 0) && (newTilePos.y < (tilemap.height - 1)) && (newTilePos.x < (tilemap.width - 1))) {
+								// Foreground collision by checking AABB corners of monster in x and y direction
+								const float boxDim = (monster.scale / 2.0f) * 0.85f;
+								glm::vec2 aabbs[2][4];
+								aabbs[0][0] = { newPos.x - boxDim, monster.position.y - boxDim };
+								aabbs[0][1] = { newPos.x + boxDim, monster.position.y - boxDim };
+								aabbs[0][2] = { newPos.x + boxDim, monster.position.y + boxDim };
+								aabbs[0][3] = { newPos.x - boxDim, monster.position.y + boxDim };
+								aabbs[1][0] = { monster.position.x - boxDim, newPos.y - boxDim };
+								aabbs[1][1] = { monster.position.x + boxDim, newPos.y - boxDim };
+								aabbs[1][2] = { monster.position.x + boxDim, newPos.y + boxDim };
+								aabbs[1][3] = { monster.position.x - boxDim, newPos.y + boxDim };
+								const int32_t collRange = 2;
+								bool cancelDir[2] = { false, false };
+								for (int32_t y = currTilePos.y - collRange; y <= currTilePos.y + collRange; y++) {
+									for (int32_t x = currTilePos.x - collRange; x <= currTilePos.x + collRange; x++) {
+										for (auto i = 0; i < 2; i++) {
+											for (auto& p : aabbs[i]) {
+												glm::ivec2 chkTilePos = glm::ivec2((int)round(p.x), (int)round(p.y));
+												if ((chkTilePos.x < 0) || (chkTilePos.y < 0) || (chkTilePos.x > TILEMAP_MAX_DIM - 1) || (chkTilePos.y > TILEMAP_MAX_DIM - 1)) {
+													continue;
+												}
+												// Cancel out movement in blocked direction
+												if (tilemap.foregroundLayer[chkTilePos.x][chkTilePos.y] != UINT32_MAX) {
+													newPos[i] = monster.position[i];
+													break;
+												}
+											}
 										}
 									}
 								}
 							}
-
-							if (move) {
-								if (cancelX) {
-									newMonsterPos.x = monster.position.x;
-								}
-								if (cancelY) {
-									newMonsterPos.y = monster.position.y;
-								}
-								monster.position = newMonsterPos;
-							}
+							// @todo: outside of check as monsters can spawn outside of the playfield
+							monster.position = newPos;
 							monster.velocity *= 0.01f * delta;
 						}
 					}
@@ -685,7 +673,7 @@ void Game::Game::update(float delta)
 						}
 					}
 				}
-			});
+				});
 		}
 
 		threadPool.wait();
@@ -729,7 +717,6 @@ void Game::Game::updateInput(float delta)
 		}
 	}
 	player.direction = glm::vec2(.0f, .0f);
-	glm::ivec2 playerTilePos = tilemap.tilePosFromVisualPos(player.position);
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
 		player.direction.x = -1.0f;
 	}
@@ -746,54 +733,37 @@ void Game::Game::updateInput(float delta)
 	if (glm::length(player.direction) != 0.0f) {
 		glm::vec2 newPlayerPos = player.position + player.direction * playerSpeed * delta;
 		glm::ivec2 newTilePos = glm::ivec2{ (int)(floor(newPlayerPos.x + 0.5f)), (int)(floor(newPlayerPos.y + 0.5f)) };
-		glm::ivec2 playerTilePos = player.tilePos();
-		bool move = true;
-		// Bounds check
-		if ((newTilePos.x < 0) || (newTilePos.y < 0) || (newTilePos.y >= (tilemap.height - 1)) || (newTilePos.x >= (tilemap.width - 1))) {
-			move = false;
-		}
-		// Foreground collision
-		// Check AABB corners of player
-		const float boxDim = (player.scale / 2.0f) * 0.85f;
-		glm::vec2 AABB[4] = {
-			glm::vec2(newPlayerPos.x - boxDim, newPlayerPos.y - boxDim),
-			glm::vec2(newPlayerPos.x + boxDim, newPlayerPos.y - boxDim),
-			glm::vec2(newPlayerPos.x + boxDim, newPlayerPos.y + boxDim),
-			glm::vec2(newPlayerPos.x - boxDim, newPlayerPos.y + boxDim),
-		};
-
-		const int32_t collRange = 2;
-		int32_t sx = playerTilePos.x - collRange;
-		int32_t ex = playerTilePos.x + collRange;
-		int32_t sy = playerTilePos.y - collRange;
-		int32_t ey = playerTilePos.y + collRange;
-		bool cancelX = false;
-		bool cancelY = false;
-		for (auto& p : AABB) {
-			for (int32_t y = sy; y <= ey; y++) {
-				for (int32_t x = sx; x <= ex; x++) {
-					glm::ivec2 chkTilePos = glm::vec2((int)round(p.x), (int)round(p.y));
-					if ((chkTilePos.x < 0) || (chkTilePos.y < 0) || (chkTilePos.x > TILEMAP_MAX_DIM - 1) || (chkTilePos.y > TILEMAP_MAX_DIM - 1)) {
-						continue;
-					}
-					if (tilemap.foregroundLayer[chkTilePos.x][chkTilePos.y] != UINT32_MAX) {
-						// Only cancel in colliding direction
-						if (tilemap.foregroundLayer[chkTilePos.x][playerTilePos.y] != UINT32_MAX) {
-							cancelX = true;
-						}
-						if (tilemap.foregroundLayer[playerTilePos.x][chkTilePos.y] != UINT32_MAX) {
-							cancelY = true;
+		glm::ivec2 currTilePos = player.tilePos();
+		if ((newTilePos.x >= 0) && (newTilePos.y >= 0) && (newTilePos.y < (tilemap.height - 1)) && (newTilePos.x < (tilemap.width - 1))) {
+			// Foreground collision by checking AABB corners of player in x and y direction
+			const float boxDim = (player.scale / 2.0f) * 0.85f;
+			glm::vec2 aabbs[2][4];
+			aabbs[0][0] = { newPlayerPos.x - boxDim, player.position.y - boxDim };
+			aabbs[0][1] = { newPlayerPos.x + boxDim, player.position.y - boxDim };
+			aabbs[0][2] = { newPlayerPos.x + boxDim, player.position.y + boxDim };
+			aabbs[0][3] = { newPlayerPos.x - boxDim, player.position.y + boxDim };
+			aabbs[1][0] = { player.position.x - boxDim, newPlayerPos.y - boxDim };
+			aabbs[1][1] = { player.position.x + boxDim, newPlayerPos.y - boxDim };
+			aabbs[1][2] = { player.position.x + boxDim, newPlayerPos.y + boxDim };
+			aabbs[1][3] = { player.position.x - boxDim, newPlayerPos.y + boxDim };
+			const int32_t collRange = 2;
+			bool cancelDir[2] = { false, false };
+			for (int32_t y = currTilePos.y - collRange; y <= currTilePos.y + collRange; y++) {
+				for (int32_t x = currTilePos.x - collRange; x <= currTilePos.x + collRange; x++) {
+					for (auto i = 0; i < 2; i++) {
+						for (auto& p : aabbs[i]) {
+							glm::ivec2 chkTilePos = glm::ivec2((int)round(p.x), (int)round(p.y));
+							if ((chkTilePos.x < 0) || (chkTilePos.y < 0) || (chkTilePos.x > TILEMAP_MAX_DIM - 1) || (chkTilePos.y > TILEMAP_MAX_DIM - 1)) {
+								continue;
+							}
+							// Cancel out movement in blocked direction
+							if (tilemap.foregroundLayer[chkTilePos.x][chkTilePos.y] != UINT32_MAX) {
+								newPlayerPos[i] = player.position[i];
+								break;
+							}
 						}
 					}
 				}
-			}
-		}
-		if (move) {
-			if (cancelX) {
-				newPlayerPos.x = player.position.x;
-			}
-			if (cancelY) {
-				newPlayerPos.y = player.position.y;
 			}
 			player.position = newPlayerPos;
 		}
@@ -809,7 +779,6 @@ void Game::Game::updateInput(float delta)
 			monster.velocity += dir * 0.5f;
 		}
 	}
-
 }
 
 std::optional<Game::Entities::Monster> Game::Game::findClosestEnemy()
