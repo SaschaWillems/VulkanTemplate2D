@@ -619,9 +619,56 @@ void Game::Game::update(float delta)
 					monster.direction = glm::normalize(player.position - monster.position);
 					monster.velocity += monster.direction * monster.speed * 0.01f;
 					if (glm::length(monster.direction) > 0.0f) {
-						//monster.position += monster.direction * monster.speed * delta;
 						if (glm::length(monster.velocity) > 0.1f) {
-							monster.position += monster.velocity * delta * 100.0f;
+							glm::vec2 newMonsterPos = monster.position + monster.velocity * delta * 100.0f;
+
+							// @todo: Only cancel movement in blocked direction (so monters won't get stuck along walls)
+							bool move = true;
+							// Foreground collision
+							// Check AABB corners of player
+							const float boxDim = (player.scale / 2.0f) * 0.85f;
+							glm::vec2 AABB[4] = {
+								glm::vec2(newMonsterPos.x - boxDim, newMonsterPos.y - boxDim),
+								glm::vec2(newMonsterPos.x + boxDim, newMonsterPos.y - boxDim),
+								glm::vec2(newMonsterPos.x + boxDim, newMonsterPos.y + boxDim),
+								glm::vec2(newMonsterPos.x - boxDim, newMonsterPos.y + boxDim),
+							};
+
+							glm::ivec2 monsterTilePos = monster.tilePos();
+							const int32_t collRange = 2;
+							int32_t sx = monsterTilePos.x - collRange;
+							int32_t ex = monsterTilePos.x + collRange;
+							int32_t sy = monsterTilePos.y - collRange;
+							int32_t ey = monsterTilePos.y + collRange;
+							bool cancelX = false;
+							bool cancelY = false;
+							for (auto& p : AABB) {
+								for (int32_t y = sy; y <= ey; y++) {
+									for (int32_t x = sx; x <= ex; x++) {
+										glm::ivec2 chkTilePos = glm::vec2((int)round(p.x), (int)round(p.y));
+										if ((chkTilePos.x < 0) || (chkTilePos.y < 0) || (chkTilePos.x > TILEMAP_MAX_DIM - 1) || (chkTilePos.y > TILEMAP_MAX_DIM - 1)) {
+											continue;
+										}
+										// Only cancel in colliding direction
+										if (tilemap.foregroundLayer[chkTilePos.x][monsterTilePos.y] != UINT32_MAX) {
+											cancelX = true;
+										}
+										if (tilemap.foregroundLayer[monsterTilePos.x][chkTilePos.y] != UINT32_MAX) {
+											cancelY = true;
+										}
+									}
+								}
+							}
+
+							if (move) {
+								if (cancelX) {
+									newMonsterPos.x = monster.position.x;
+								}
+								if (cancelY) {
+									newMonsterPos.y = monster.position.y;
+								}
+								monster.position = newMonsterPos;
+							}
 							monster.velocity *= 0.01f * delta;
 						}
 					}
@@ -720,6 +767,8 @@ void Game::Game::updateInput(float delta)
 		int32_t ex = playerTilePos.x + collRange;
 		int32_t sy = playerTilePos.y - collRange;
 		int32_t ey = playerTilePos.y + collRange;
+		bool cancelX = false;
+		bool cancelY = false;
 		for (auto& p : AABB) {
 			for (int32_t y = sy; y <= ey; y++) {
 				for (int32_t x = sx; x <= ex; x++) {
@@ -728,12 +777,24 @@ void Game::Game::updateInput(float delta)
 						continue;
 					}
 					if (tilemap.foregroundLayer[chkTilePos.x][chkTilePos.y] != UINT32_MAX) {
-						move = false;
+						// Only cancel in colliding direction
+						if (tilemap.foregroundLayer[chkTilePos.x][playerTilePos.y] != UINT32_MAX) {
+							cancelX = true;
+						}
+						if (tilemap.foregroundLayer[playerTilePos.x][chkTilePos.y] != UINT32_MAX) {
+							cancelY = true;
+						}
 					}
 				}
 			}
 		}
 		if (move) {
+			if (cancelX) {
+				newPlayerPos.x = player.position.x;
+			}
+			if (cancelY) {
+				newPlayerPos.y = player.position.y;
+			}
 			player.position = newPlayerPos;
 		}
 	}
