@@ -91,7 +91,6 @@ enum class PostProcessEffect {
 };
 
 float kbDebounce;
-
 // AngelCode .fnt format structs and classes
 
 struct bmchar {
@@ -1678,7 +1677,6 @@ public:
 			selectedTile = editor.selectedTile;
 		} else {
 			selectedTile = { -1, -1 };
-			//selectedTile = game.player.tilePos();
 		}
 		cb->updatePushConstant(pipelineLayouts["tilemap"], 0, &selectedTile);
 		cb->bindPipeline(pipelines["tilemap"]);
@@ -1777,6 +1775,9 @@ public:
 				if (event.key.code == sf::Keyboard::F3) {
 					editor.activeLayer = !editor.activeLayer;
 				}
+				if (event.key.code == sf::Keyboard::F4) {
+					editor.foregroundVisible = !editor.foregroundVisible;
+				}
 				if ((event.key.code == sf::Keyboard::Subtract) && (editor.tileIndex > 0)) {
 					editor.tileIndex -= 1;
 				}
@@ -1785,15 +1786,21 @@ public:
 				}
 				if ((event.key.code == sf::Keyboard::Delete) && (editor.activeLayer == 1)) {
 					if (editor.selectedTile.x > -1 && editor.selectedTile.x < TILEMAP_MAX_DIM && editor.selectedTile.y > -1 && editor.selectedTile.y < TILEMAP_MAX_DIM) {
-						game.tilemap.foregroundLayer[editor.selectedTile.x][editor.selectedTile.y] = -1;
+						game.tilemap.foregroundLayer[editor.selectedTile.x][editor.selectedTile.y] = UINT32_MAX;
 					};
+				}
+			} else {
+				if (event.key.code == sf::Keyboard::Add) {
+					screenDim *= 0.9;
+				}
+				if (event.key.code == sf::Keyboard::Subtract) {
+					screenDim *= 1.1;
 				}
 			}
 		}
 		if (event.type == sf::Event::MouseWheelScrolled) {
 			if (editor.active) {
-				screenDim.x *= 1.0 - ((float)event.mouseWheelScroll.delta * 0.1);
-				screenDim.y *= 1.0 - ((float)event.mouseWheelScroll.delta * 0.1);
+				screenDim *= 1.0 - ((float)event.mouseWheelScroll.delta * 0.1);
 			}
 		}
 	}
@@ -1813,11 +1820,12 @@ public:
 		// @todo
 		{
 			ZoneScopedN("Game update");
-			if (!paused) {
-				game.update(frameTimer);
-				game.updateInput(frameTimer);
-			// @todo
-			if (editor.active) {
+			if (!editor.active) {
+				if (!paused) {
+					game.update(frameTimer);
+					game.updateInput(frameTimer);
+				}
+			} else {
 				glm::vec2 direction = glm::vec2(.0f, .0f);
 				if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
 					direction.x = -1.0f;
