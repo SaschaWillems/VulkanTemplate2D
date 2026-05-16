@@ -1930,6 +1930,20 @@ public:
 		if (ImGui::Button("Load")) {
 			game.tilemap.load("tilemap.bin");
 		}
+		if (ImGui::Button("Clear with current tile index")) {
+			for (uint32_t x = 0; x < TILEMAP_MAX_DIM; x++) {
+				for (uint32_t y = 0; y < TILEMAP_MAX_DIM; y++) {
+					switch (editor.activeLayer) {
+					case 0:
+						game.tilemap.backgroundLayer[x][y] = editor.tileIndex;
+						break;
+					case 1:
+						game.tilemap.foregroundLayer[x][y] = editor.tileIndex;
+						break;
+					}
+				}
+			}
+		}
 		ImGui::End();
 		ImGui::SetNextWindowPos(ImVec2(20, 20), ImGuiSetCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ImVec2(0, 50), ImGuiSetCond_FirstUseEver);
